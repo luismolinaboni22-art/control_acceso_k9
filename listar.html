@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Lista de Visitantes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <h1>Corporación K9</h1>
+    <nav>
+        <span>{{ current_user.name }}</span>
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+    </nav>
+</header>
+<main>
+<h2>Visitantes Registrados</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Cédula</th>
+            <th>Empresa</th>
+            <th>Placa</th>
+            <th>Persona Visitada</th>
+            <th>Propósito</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in visitantes %}
+        <tr>
+            <td>{{ v.nombre }}</td>
+            <td>{{ v.cedula }}</td>
+            <td>{{ v.empresa }}</td>
+            <td>{{ v.placa }}</td>
+            <td>{{ v.persona_visitada }}</td>
+            <td>{{ v.proposito }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</main>
+</body>
+</html>
