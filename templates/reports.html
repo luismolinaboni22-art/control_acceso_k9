@@ -2,99 +2,54 @@
 
 {% block content %}
 
-<h2 class="fw-bold mb-4" style="color:#2B2B2B;">Reportes de Visitantes</h2>
+<h3 class="fw-bold mb-4">Reportes de Visitantes</h3>
 
-<!-- Tarjeta del filtro -->
-<div class="card shadow-sm p-4 mb-4" style="border-left: 6px solid #00A3E0;">
+<form method="GET" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Nombre</label>
+        <input type="text" name="nombre" value="{{ nombre }}" class="form-control">
+    </div>
 
-    <h5 class="fw-semibold mb-3" style="color:#2B2B2B;">Filtros de búsqueda</h5>
+    <div class="col-md-3">
+        <label class="form-label">Empresa</label>
+        <input type="text" name="empresa" value="{{ empresa }}" class="form-control">
+    </div>
 
-    <form method="GET" action="{{ url_for('reports') }}">
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Nombre</label>
-                <input type="text" name="nombre" class="form-control"
-                       value="{{ nombre }}">
-            </div>
+    <div class="col-md-3">
+        <label class="form-label">Desde</label>
+        <input type="datetime-local" name="desde" value="{{ desde }}" class="form-control">
+    </div>
 
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Empresa</label>
-                <input type="text" name="empresa" class="form-control"
-                       value="{{ empresa }}">
-            </div>
+    <div class="col-md-3">
+        <label class="form-label">Hasta</label>
+        <input type="datetime-local" name="hasta" value="{{ hasta }}" class="form-control">
+    </div>
 
-            <div class="col-md-2">
-                <label class="form-label fw-semibold">Desde</label>
-                <input type="date" name="desde" class="form-control"
-                       value="{{ desde }}">
-            </div>
+    <div class="col-12">
+        <button class="btn btn-primary" style="background-color:#00A3E0;">Filtrar</button>
+    </div>
+</form>
 
-            <div class="col-md-2">
-                <label class="form-label fw-semibold">Hasta</label>
-                <input type="date" name="hasta" class="form-control"
-                       value="{{ hasta }}">
-            </div>
-        </div>
-
-        <div class="d-flex justify-content-end gap-2">
-            <a href="{{ url_for('reports') }}" class="btn btn-secondary fw-semibold">
-                Limpiar filtros
-            </a>
-
-            <button class="btn fw-semibold"
-                    style="background-color:#00A3E0; color:white;">
-                Buscar
-            </button>
-        </div>
-    </form>
-</div>
-
-<!-- Tabla de resultados -->
-<div class="card shadow-sm p-4" style="background:white;">
-    <h5 class="fw-semibold mb-3" style="color:#2B2B2B;">
-        Resultados ({{ visitantes|length }})
-    </h5>
-
-    <table class="table table-striped table-hover">
-        <thead style="background-color:#00A3E0; color:white;">
-            <tr>
-                <th>Nombre</th>
-                <th>Cédula</th>
-                <th>Empresa</th>
-                <th>Placa</th>
-                <th>Persona Visitada</th>
-                <th>Propósito</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for v in visitantes %}
-            <tr>
-                <td>{{ v.nombre }}</td>
-                <td>{{ v.cedula }}</td>
-                <td>{{ v.empresa }}</td>
-                <td>{{ v.placa }}</td>
-                <td>{{ v.persona_visitada }}</td>
-                <td>{{ v.proposito }}</td>
-
-                <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-
-                <td>
-                    {% if v.hora_salida %}
-                        <span class="text-success fw-bold">
-                            {{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') }}
-                        </span>
-                    {% else %}
-                        <span class="text-danger fw-bold">Pendiente</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+<table class="table table-striped">
+    <thead class="table-primary">
+        <tr>
+            <th>Nombre</th>
+            <th>Empresa</th>
+            <th>Entrada</th>
+            <th>Salida</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in visitantes %}
+        <tr>
+            <td>{{ v.nombre }}</td>
+            <td>{{ v.empresa }}</td>
+            <td>{{ v.hora_entrada }}</td>
+            <td>{{ v.hora_salida }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
 {% endblock %}
 
