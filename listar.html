@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <title>Lista de Visitantes</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-<header>
-    <h1>Corporación K9</h1>
+<header class="d-flex justify-content-between align-items-center p-3 bg-primary text-white">
+    <h1>Registro de visitantes Holcim Costa Rica</h1>
     <nav>
-        <span>{{ current_user.name }}</span>
-        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+        <span>Usuario: {{ current_user.name }}</span> |
+        <a href="{{ url_for('logout') }}" class="text-white">Cerrar sesión</a>
     </nav>
 </header>
-<main>
+<main class="container my-4">
 <h2>Visitantes Registrados</h2>
-<table>
-    <thead>
+<table class="table table-striped table-bordered mt-3">
+    <thead class="table-dark">
         <tr>
             <th>Nombre</th>
             <th>Cédula</th>
@@ -24,6 +25,8 @@
             <th>Placa</th>
             <th>Persona Visitada</th>
             <th>Propósito</th>
+            <th>Hora de entrada</th>
+            <th>Hora de salida</th>
         </tr>
     </thead>
     <tbody>
@@ -35,6 +38,20 @@
             <td>{{ v.placa }}</td>
             <td>{{ v.persona_visitada }}</td>
             <td>{{ v.proposito }}</td>
+            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>
+                {% if not v.hora_salida %}
+                <form action="{{ url_for('registrar_salida', visitor_id=v.id) }}" method="post" style="display:inline;">
+                    <button class="btn btn-danger btn-sm">Registrar salida</button>
+                </form>
+                {% else %}
+                    {{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') }}
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8" class="text-center">No hay visitantes registrados.</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -42,3 +59,4 @@
 </main>
 </body>
 </html>
+
