@@ -1,96 +1,39 @@
 {% extends "base.html" %}
 
 {% block content %}
+<h3 class="mb-4 fw-bold" style="color:#2B2B2B;">Resumen de Visitantes</h3>
 
-<!-- Recuadro Visitantes Activos (centrado vertical y a la derecha) -->
-<div id="recuadro-activos" style="
-    position: fixed;
-    top: 50%;
-    right: 20px;
-    transform: translateY(-50%);
-    background-color: #ED1C24;
-    color: white;
-    padding: 15px 25px;
-    border-radius: 10px;
-    font-weight: bold;
-    font-size: 1.2em;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.25);
-    z-index: 999;
-    text-align: center;
-">
-    Visitantes en el sitio: {{ active_visitors_count }}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm p-3">
+            <h5 class="fw-semibold">Visitantes activos</h5>
+            <p class="display-6 fw-bold" style="color:#00A3E0;">
+                {{ active_visitors_count }}
+            </p>
+        </div>
+    </div>
 </div>
 
+<h4 class="fw-bold mb-3">Últimos Visitantes</h4>
 
-<h2 class="fw-bold mb-4" style="color:#231F20;">Bienvenido {{ current_user.name }}</h2>
-
-<!-- Botones principales -->
-<div class="d-flex flex-wrap gap-2 mb-4">
-    <a href="{{ url_for('registrar') }}" class="btn text-white fw-bold" style="background-color:#ED1C24;">Registrar Visitante</a>
-    <a href="{{ url_for('listar') }}" class="btn btn-dark fw-bold">Listar Visitantes</a>
-    <a href="{{ url_for('reports') }}" class="btn btn-secondary fw-bold">Reportes</a>
-    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-dark fw-bold">Usuarios</a>
-    <a href="{{ url_for('admin_sites') }}" class="btn btn-outline-dark fw-bold">Sitios</a>
-
-    {% if current_user.role in ['superadmin', 'admin'] %}
-        <a href="{{ url_for('admin_configuracion') }}" class="btn btn-outline-danger fw-bold">Configuración</a>
-    {% endif %}
-</div>
-
-
-<h3 class="fw-bold mt-4 mb-3" style="color:#231F20;">Visitantes recientes</h3>
-
-<table class="table table-striped table-bordered shadow-sm">
-    <thead class="table-danger">
+<table class="table table-hover table-striped">
+    <thead class="table-primary">
         <tr>
             <th>Nombre</th>
-            <th>Cédula</th>
             <th>Empresa</th>
-            <th>Placa</th>
-            <th>Persona a visitar</th>
-            <th>Propósito</th>
-            <th>Hora de entrada</th>
+            <th>Entrada</th>
         </tr>
     </thead>
     <tbody>
-        {% for v in visitantes %}
+    {% for v in visitantes %}
         <tr>
             <td>{{ v.nombre }}</td>
-            <td>{{ v.cedula }}</td>
             <td>{{ v.empresa }}</td>
-            <td>{{ v.placa }}</td>
-            <td>{{ v.persona_visitada }}</td>
-            <td>{{ v.proposito }}</td>
-            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ v.hora_entrada.strftime('%d/%m/%Y %H:%M') }}</td>
         </tr>
-        {% else %}
-        <tr>
-            <td colspan="7" class="text-center">No hay visitantes registrados.</td>
-        </tr>
-        {% endfor %}
+    {% endfor %}
     </tbody>
 </table>
-
-<!-- Script para actualización automática del recuadro -->
-<script>
-async function actualizarVisitantes() {
-    try {
-        const response = await fetch('{{ url_for("api_visitantes_activos") }}');
-        const data = await response.json();
-
-        const box = document.getElementById('recuadro-activos');
-        if (box) {
-            box.innerText = "Visitantes en el sitio: " + data.active_count;
-        }
-
-    } catch (e) {
-        console.error("Error actualizando visitantes:", e);
-    }
-}
-
-// actualizar cada 10 segundos
-setInterval(actualizarVisitantes, 10000);
-</script>
 
 {% endblock %}
 
