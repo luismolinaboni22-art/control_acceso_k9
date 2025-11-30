@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Site, Visitor
@@ -14,10 +14,10 @@ db.init_app(app)
 # ---------------------------------------------------------
 # LOGIN MANAGER
 # ---------------------------------------------------------
-login = LoginManager(app)
-login.login_view = 'login'
+login_manager = LoginManager(app)
+login_manager.login_view = 'login_view'  # coincide con el nombre de la función login
 
-@login.user_loader
+@login_manager.user_loader
 def load_user(uid):
     return User.query.get(int(uid))
 
@@ -37,7 +37,8 @@ def login_view():
 
         # Validación para evitar errores SQL
         if not email or not password:
-            return render_template('login.html', error="Debe ingresar correo y contraseña")
+            flash("Debe ingresar correo y contraseña", "danger")
+            return redirect(url_for('login_view'))
 
         u = User.query.filter_by(email=email).first()
 
@@ -45,11 +46,13 @@ def login_view():
             login_user(u)
             return redirect(url_for('index'))
 
-        return render_template('login.html', error="Credenciales inválidas")
+        flash("Credenciales inválidas", "danger")
+        return redirect(url_for('login_view'))
 
     return render_template('login.html')
 
 @app.route('/logout')
+@login_required
 def logout():
     logout_user()
     return redirect(url_for('login_view'))
@@ -59,3 +62,4 @@ def logout():
 # ---------------------------------------------------------
 with app.app_context():
     db.create_all()
+
