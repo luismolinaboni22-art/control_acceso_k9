@@ -15,7 +15,7 @@ db.init_app(app)
 # LOGIN MANAGER
 # ---------------------------------------------------------
 login_manager = LoginManager(app)
-login_manager.login_view = 'login_view'  # coincide con el nombre de la función login
+login_manager.login_view = 'login_view'  # coincide con la función de login
 
 @login_manager.user_loader
 def load_user(uid):
@@ -35,7 +35,6 @@ def login_view():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '').strip()
 
-        # Validación para evitar errores SQL
         if not email or not password:
             flash("Debe ingresar correo y contraseña", "danger")
             return redirect(url_for('login_view'))
@@ -58,7 +57,35 @@ def logout():
     return redirect(url_for('login_view'))
 
 # ---------------------------------------------------------
-# CREAR BASE DE DATOS Y SUPERADMIN (SE EJECUTA UNA SOLA VEZ EN RENDER)
+# RUTAS TEMPORALES PARA EL DASHBOARD
+# ---------------------------------------------------------
+@app.route('/registrar')
+@login_required
+def registrar():
+    return "Página de registrar visitantes (temporal)"
+
+@app.route('/listar')
+@login_required
+def listar():
+    return "Página de listar visitantes (temporal)"
+
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    return "Página de usuarios (temporal)"
+
+@app.route('/admin/sites')
+@login_required
+def admin_sites():
+    return "Página de sitios (temporal)"
+
+@app.route('/reports')
+@login_required
+def reports():
+    return "Página de reportes (temporal)"
+
+# ---------------------------------------------------------
+# CREAR BASE DE DATOS Y SUPERADMIN
 # ---------------------------------------------------------
 with app.app_context():
     db.create_all()
@@ -74,5 +101,6 @@ with app.app_context():
         db.session.add(u)
         db.session.commit()
         print("Superadmin creado")
+
 
 
