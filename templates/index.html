@@ -4,77 +4,24 @@
     <meta charset="UTF-8">
     <title>Bienvenido al Sistema K9</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            margin: 0;
-        }
-        header {
-            background-color: #002f4b;
-            color: white;
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        header h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        nav a {
-            color: white;
-            margin-left: 15px;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        nav a:hover {
-            text-decoration: underline;
-        }
-        main {
-            padding: 20px;
-        }
-        .welcome {
-            font-size: 20px;
-            margin-bottom: 20px;
-        }
-        .menu-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .menu-buttons a {
-            padding: 15px 25px;
-            background-color: #005f8f;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .menu-buttons a:hover {
-            background-color: #004466;
-        }
-    </style>
 </head>
 <body>
-    <header>
-        <h1>Corporación K9</h1>
-        <nav>
-            <span>{{ current_user.name }}</span>
-            <a href="{{ url_for('logout') }}">Cerrar sesión</a>
-        </nav>
-    </header>
-    <main>
-        <div class="welcome">
-            Bienvenido al Sistema K9, {{ current_user.name }}.
-        </div>
-        <div class="menu-buttons">
-            <a href="{{ url_for('registrar') }}">Registrar Visitante</a>
-            <a href="{{ url_for('listar') }}">Listar Visitantes</a>
-            <a href="{{ url_for('admin_users') }}">Usuarios</a>
-            <a href="{{ url_for('admin_sites') }}">Sitios</a>
-            <a href="{{ url_for('reports') }}">Reportes</a>
-        </div>
-    </main>
+<header>
+    <h1>Corporación K9</h1>
+    <nav>
+        <span>{{ current_user.name }}</span>
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+    </nav>
+</header>
+<main>
+    <h2>Bienvenido al Sistema K9, {{ current_user.name }}.</h2>
+    <div class="menu-buttons">
+        <a href="{{ url_for('registrar') }}">Registrar Visitante</a>
+        <a href="{{ url_for('listar') }}">Listar Visitantes</a>
+        <a href="{{ url_for('admin_users') }}">Usuarios</a>
+        <a href="{{ url_for('admin_sites') }}">Sitios</a>
+        <a href="{{ url_for('reports') }}">Reportes</a>
+    </div>
+</main>
 </body>
 </html>
