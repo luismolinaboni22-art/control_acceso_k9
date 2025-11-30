@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from flask import abort
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tu_secreto_aqui'
@@ -14,6 +16,25 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 # ---------------------------------------------------------------------
+# DECORADOR PARA ROLES
+# ---------------------------------------------------------------------
+def role_required(role):
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if not current_user or not hasattr(current_user, 'role'):
+                flash("No tiene permisos para acceder.", "danger")
+                return redirect(url_for('index'))
+
+            if current_user.role == role or current_user.role == 'superadmin':
+                return f(*args, **kwargs)
+
+            flash("No tiene permisos para acceder.", "danger")
+            return redirect(url_for('index'))
+        return wrapped
+    return decorator
+
+# ---------------------------------------------------------------------
 # MODELOS
 # ---------------------------------------------------------------------
 class User(UserMixin, db.Model):
@@ -21,7 +42,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(200), unique=True, nullable=False)
     name = db.Column(db.String(200))
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), default="oficial")
+    role = db.Column(db.String(50), default="oficial")  # oficial / admin / superadmin
     active = db.Column(db.Boolean, default=True)
 
 class Visitor(db.Model):
@@ -42,7 +63,6 @@ class Visitor(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -58,13 +78,11 @@ def login():
 
     return render_template('login.html')
 
-
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
-
 
 # ---------------------------------------------------------------------
 # DASHBOARD PRINCIPAL
@@ -73,29 +91,21 @@ def logout():
 @login_required
 def index():
 
-    # Visitantes activos dentro de planta
     active_visitors_count = Visitor.query.filter_by(hora_salida=None).count()
 
-    # Visitantes pendientes de salida
     pending_count = Visitor.query.filter(
         Visitor.hora_salida.is_(None)
     ).count()
 
-    # Hoy
     today = date.today()
     today_start = datetime.combine(today, datetime.min.time())
 
-    # Visitantes ingresados hoy
     today_count = Visitor.query.filter(
         Visitor.hora_entrada >= today_start
     ).count()
 
-    # Total del día (entrada + salida)
-    total_today = Visitor.query.filter(
-        Visitor.hora_entrada >= today_start
-    ).count()
+    total_today = today_count
 
-    # Últimos 10 visitantes
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
 
     # ============================================================
@@ -110,12 +120,9 @@ def index():
     for v in visitantes_sin_salida:
         horas = (datetime.utcnow() - v.hora_entrada).total_seconds() / 3600
         if horas >= 8:
-            alertas.append(
-                f"⚠ {v.nombre} lleva más de {int(horas)} horas dentro de planta."
-            )
+            alertas.append(f"⚠ {v.nombre} lleva más de {int(horas)} horas dentro de planta.")
 
     alertas_totales = len(alertas)
-    # ============================================================
 
     return render_template(
         'index.html',
@@ -128,7 +135,6 @@ def index():
         alertas=alertas,
         alertas_totales=alertas_totales
     )
-
 
 # ---------------------------------------------------------------------
 # REGISTRO DE VISITANTES
@@ -152,7 +158,6 @@ def registrar():
 
     return render_template('registrar.html')
 
-
 # ---------------------------------------------------------------------
 # LISTADO DE VISITANTES
 # ---------------------------------------------------------------------
@@ -161,7 +166,6 @@ def registrar():
 def listar():
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
     return render_template('listar.html', visitantes=visitantes)
-
 
 # ---------------------------------------------------------------------
 # REGISTRAR SALIDA
@@ -175,15 +179,13 @@ def registrar_salida(visitor_id):
         visitor.hora_salida = datetime.utcnow()
         db.session.commit()
         flash(f'Salida registrada para {visitor.nombre}', 'success')
-
     else:
         flash(f'La salida de {visitor.nombre} ya estaba registrada', 'warning')
 
     return redirect(url_for('listar'))
 
-
 # ---------------------------------------------------------------------
-# API - VISITANTES ACTIVOS
+# API DE VISITANTES ACTIVOS
 # ---------------------------------------------------------------------
 @app.route('/api/visitantes/activos')
 @login_required
@@ -191,16 +193,13 @@ def api_visitantes_activos():
     count = Visitor.query.filter_by(hora_salida=None).count()
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
 
-    visitantes_data = []
-    for v in visitantes:
-        visitantes_data.append({
-            'id': v.id,
-            'nombre': v.nombre,
-            'hora_salida': v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else None
-        })
+    visitantes_data = [{
+        'id': v.id,
+        'nombre': v.nombre,
+        'hora_salida': v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else None
+    } for v in visitantes]
 
     return jsonify({'active_count': count, 'visitantes': visitantes_data})
-
 
 # ---------------------------------------------------------------------
 # REPORTES
@@ -218,13 +217,10 @@ def reports():
 
     if nombre:
         query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
-
     if empresa:
         query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
-
     if desde:
         query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
-
     if hasta:
         query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
 
@@ -237,47 +233,42 @@ def reports():
                            desde=desde,
                            hasta=hasta)
 
-
 # ---------------------------------------------------------------------
-# ADMIN
+# ADMINISTRACIÓN
 # ---------------------------------------------------------------------
 @app.route('/admin/users')
 @login_required
+@role_required('superadmin')
 def admin_users():
-    return "Usuarios"
+    users = User.query.all()
+    return render_template('admin_users.html', users=users)
 
 @app.route('/admin/sites')
 @login_required
+@role_required('admin')
 def admin_sites():
     return "Sitios"
 
 @app.route('/admin/configuracion')
 @login_required
+@role_required('admin')
 def admin_configuracion():
     return "Configuración"
 
-
 # ---------------------------------------------------------------------
-# INICIALIZAR DB Y CREAR SUPER ADMIN
+# CREAR SUPER ADMIN SI NO EXISTE
 # ---------------------------------------------------------------------
 with app.app_context():
     db.create_all()
-
     if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
-        user = User(
+        super_user = User(
             email="jorgemolinabonilla@gmail.com",
             name="Super Admin",
             password_hash=generate_password_hash("Cambio123!"),
             role="superadmin"
         )
-        db.session.add(user)
+        db.session.add(super_user)
         db.session.commit()
-
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-
-
-
