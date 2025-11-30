@@ -58,8 +58,21 @@ def logout():
     return redirect(url_for('login_view'))
 
 # ---------------------------------------------------------
-# CREAR BASE DE DATOS (SE EJECUTA UNA SOLA VEZ EN RENDER)
+# CREAR BASE DE DATOS Y SUPERADMIN (SE EJECUTA UNA SOLA VEZ EN RENDER)
 # ---------------------------------------------------------
 with app.app_context():
     db.create_all()
+
+    # Crear superadmin si no existe
+    if not User.query.filter_by(email='jorgemolinabonilla@gmail.com').first():
+        u = User(
+            email='jorgemolinabonilla@gmail.com',
+            name='Super Admin',
+            role='superadmin'
+        )
+        u.password_hash = generate_password_hash('Cambio123!')
+        db.session.add(u)
+        db.session.commit()
+        print("Superadmin creado")
+
 
