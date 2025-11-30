@@ -1,129 +1,100 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Reportes de Visitantes</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-<header class="d-flex justify-content-between align-items-center p-3 bg-primary text-white">
-    <h1>Registro de visitantes Holcim Costa Rica - Reportes</h1>
-    <nav>
-        <span>Usuario: {{ current_user.name }}</span> |
-        <a href="{{ url_for('logout') }}" class="text-white">Cerrar sesión</a>
-    </nav>
-</header>
+{% extends "base.html" %}
 
-<main class="container my-4">
+{% block content %}
 
-<!-- Recuadro visitantes activos centrado verticalmente a la derecha -->
-<div id="recuadro-activos" style="
-    position: fixed;
-    top: 50%;
-    right: 20px;
-    transform: translateY(-50%);
-    background-color: #007BFF;
-    color: white;
-    padding: 15px 25px;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 1.2em;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.3);
-    z-index: 1000;
-    text-align: center;
-">
-    Visitantes en las instalaciones: 0
+<h2 class="fw-bold mb-4" style="color:#2B2B2B;">Reportes de Visitantes</h2>
+
+<!-- Tarjeta del filtro -->
+<div class="card shadow-sm p-4 mb-4" style="border-left: 6px solid #00A3E0;">
+
+    <h5 class="fw-semibold mb-3" style="color:#2B2B2B;">Filtros de búsqueda</h5>
+
+    <form method="GET" action="{{ url_for('reports') }}">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Nombre</label>
+                <input type="text" name="nombre" class="form-control"
+                       value="{{ nombre }}">
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Empresa</label>
+                <input type="text" name="empresa" class="form-control"
+                       value="{{ empresa }}">
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Desde</label>
+                <input type="date" name="desde" class="form-control"
+                       value="{{ desde }}">
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label fw-semibold">Hasta</label>
+                <input type="date" name="hasta" class="form-control"
+                       value="{{ hasta }}">
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <a href="{{ url_for('reports') }}" class="btn btn-secondary fw-semibold">
+                Limpiar filtros
+            </a>
+
+            <button class="btn fw-semibold"
+                    style="background-color:#00A3E0; color:white;">
+                Buscar
+            </button>
+        </div>
+    </form>
 </div>
 
-<h2>Buscar Visitantes</h2>
-<form method="get" action="{{ url_for('reports') }}" class="row g-3 mb-4">
-    <div class="col-md-3">
-        <input type="text" name="nombre" class="form-control" placeholder="Nombre" value="{{ nombre }}">
-    </div>
-    <div class="col-md-3">
-        <input type="text" name="empresa" class="form-control" placeholder="Empresa" value="{{ empresa }}">
-    </div>
-    <div class="col-md-3">
-        <input type="date" name="desde" class="form-control" value="{{ desde }}">
-    </div>
-    <div class="col-md-3">
-        <input type="date" name="hasta" class="form-control" value="{{ hasta }}">
-    </div>
-    <div class="col-md-12">
-        <button class="btn btn-primary mt-2">Buscar</button>
-    </div>
-</form>
+<!-- Tabla de resultados -->
+<div class="card shadow-sm p-4" style="background:white;">
+    <h5 class="fw-semibold mb-3" style="color:#2B2B2B;">
+        Resultados ({{ visitantes|length }})
+    </h5>
 
-<table class="table table-striped table-bordered">
-    <thead class="table-dark">
-        <tr>
-            <th>Nombre</th>
-            <th>Cédula</th>
-            <th>Empresa</th>
-            <th>Placa</th>
-            <th>Persona Visitada</th>
-            <th>Propósito</th>
-            <th>Hora Entrada</th>
-            <th>Hora Salida</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for v in visitantes %}
-        <tr>
-            <td>{{ v.nombre }}</td>
-            <td>{{ v.cedula }}</td>
-            <td>{{ v.empresa }}</td>
-            <td>{{ v.placa }}</td>
-            <td>{{ v.persona_visitada }}</td>
-            <td>{{ v.proposito }}</td>
-            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td id="salida-cell-{{ v.id }}">
-                {% if v.hora_salida %}
-                    {{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') }}
-                {% else %}
-                    --
-                {% endif %}
-            </td>
-        </tr>
-        {% else %}
-        <tr>
-            <td colspan="8" class="text-center">No se encontraron registros.</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-</main>
+    <table class="table table-striped table-hover">
+        <thead style="background-color:#00A3E0; color:white;">
+            <tr>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>Empresa</th>
+                <th>Placa</th>
+                <th>Persona Visitada</th>
+                <th>Propósito</th>
+                <th>Entrada</th>
+                <th>Salida</th>
+            </tr>
+        </thead>
 
-<script>
-async function actualizarVisitantes() {
-    try {
-        const response = await fetch('{{ url_for("api_visitantes_activos") }}');
-        const data = await response.json();
+        <tbody>
+            {% for v in visitantes %}
+            <tr>
+                <td>{{ v.nombre }}</td>
+                <td>{{ v.cedula }}</td>
+                <td>{{ v.empresa }}</td>
+                <td>{{ v.placa }}</td>
+                <td>{{ v.persona_visitada }}</td>
+                <td>{{ v.proposito }}</td>
 
-        // Actualizar recuadro de visitantes activos
-        const recuadro = document.getElementById('recuadro-activos');
-        if (recuadro) {
-            recuadro.innerText = "Visitantes en las instalaciones: " + data.active_count;
-        }
+                <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
 
-        // Actualizar hora de salida en la tabla
-        data.visitantes.forEach(v => {
-            const cell = document.querySelector(`#salida-cell-${v.id}`);
-            if (v.hora_salida && cell) {
-                cell.innerText = v.hora_salida;
-            }
-        });
+                <td>
+                    {% if v.hora_salida %}
+                        <span class="text-success fw-bold">
+                            {{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </span>
+                    {% else %}
+                        <span class="text-danger fw-bold">Pendiente</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
-    } catch (error) {
-        console.error("Error al actualizar visitantes:", error);
-    }
-}
-
-// Actualizar cada 10 segundos
-setInterval(actualizarVisitantes, 10000);
-</script>
-
-</body>
-</html>
+{% endblock %}
 
