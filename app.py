@@ -1,135 +1,140 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask import Flask, render_template, redirect, url_for, request, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Site, Visitor
-from config import Config
 
-# ------------------------------
-# Inicializar app
-# ------------------------------
 app = Flask(__name__)
-app.config.from_object(Config)
-db.init_app(app)
+app.config['SECRET_KEY'] = 'tu_secreto_aqui'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///visitas.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ------------------------------
-# Login Manager
-# ------------------------------
+db = SQLAlchemy(app)
 login_manager = LoginManager(app)
-login_manager.login_view = 'login_view'
+login_manager.login_view = 'login'
 
+# =====================
+# MODELOS
+# =====================
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    name = db.Column(db.String(200))
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(50), default="oficial")
+    active = db.Column(db.Boolean, default=True)
+
+class Visitor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), nullable=False)
+    cedula = db.Column(db.String(100))
+    empresa = db.Column(db.String(200))
+    placa = db.Column(db.String(100))
+    persona_visitada = db.Column(db.String(200))
+    proposito = db.Column(db.String(300))
+    hora_entrada = db.Column(db.DateTime, default=datetime.utcnow)
+    hora_salida = db.Column(db.DateTime, nullable=True)
+
+# =====================
+# LOGIN
+# =====================
 @login_manager.user_loader
-def load_user(uid):
-    return User.query.get(int(uid))
-
-# ------------------------------
-# Rutas principales
-# ------------------------------
-@app.route('/')
-@login_required
-def index():
-    return render_template('index.html')
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 @app.route('/login', methods=['GET', 'POST'])
-def login_view():
+def login():
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '').strip()
-
-        if not email or not password:
-            flash("Debe ingresar correo y contraseña", "danger")
-            return redirect(url_for('login_view'))
-
-        u = User.query.filter_by(email=email).first()
-
-        if u and check_password_hash(u.password_hash, password):
-            login_user(u)
+        email = request.form['email']
+        password = request.form['password']
+        user = User.query.filter_by(email=email).first()
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
             return redirect(url_for('index'))
-
-        flash("Credenciales inválidas", "danger")
-        return redirect(url_for('login_view'))
-
+        flash('Credenciales inválidas', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login_view'))
+    return redirect(url_for('login'))
 
-# ------------------------------
-# Rutas del panel / dashboard
-# ------------------------------
-@app.route('/registrar', methods=['GET', 'POST'])
+# =====================
+# RUTAS PRINCIPALES
+# =====================
+@app.route('/')
+@login_required
+def index():
+    active_visitors_count = Visitor.query.filter_by(hora_salida=None).count()
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
+    return render_template('index.html', current_user=current_user,
+                           active_visitors_count=active_visitors_count,
+                           visitantes=visitantes)
+
+@app.route('/registrar', methods=['GET','POST'])
 @login_required
 def registrar():
     if request.method == 'POST':
-        nombre = request.form.get('nombre', '').strip()
-        cedula = request.form.get('cedula', '').strip()
-        empresa = request.form.get('empresa', '').strip()
-        placa = request.form.get('placa', '').strip()
-        persona_visitada = request.form.get('persona_visitada', '').strip()
-        proposito = request.form.get('proposito', '').strip()
-
-        if not nombre or not cedula:
-            flash("Nombre y cédula son obligatorios", "danger")
-            return redirect(url_for('registrar'))
-
-        visitante = Visitor(
-            nombre=nombre,
-            cedula=cedula,
-            empresa=empresa,
-            placa=placa,
-            persona_visitada=persona_visitada,
-            proposito=proposito
+        v = Visitor(
+            nombre=request.form['nombre'],
+            cedula=request.form.get('cedula'),
+            empresa=request.form.get('empresa'),
+            placa=request.form.get('placa'),
+            persona_visitada=request.form.get('persona'),
+            proposito=request.form.get('proposito')
         )
-        db.session.add(visitante)
+        db.session.add(v)
         db.session.commit()
-        flash("Visitante registrado correctamente", "success")
-        return redirect(url_for('listar'))
-
+        flash('Visitante registrado con éxito', 'success')
+        return redirect(url_for('index'))
     return render_template('registrar.html')
 
 @app.route('/listar')
 @login_required
 def listar():
-    visitantes = Visitor.query.all()
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
     return render_template('listar.html', visitantes=visitantes)
 
 @app.route('/admin/users')
 @login_required
 def admin_users():
-    users = User.query.all()
-    return render_template('admin_users.html', users=users)
+    return "Usuarios"
 
 @app.route('/admin/sites')
 @login_required
 def admin_sites():
-    sites = Site.query.all()
-    return render_template('admin_sites.html', sites=sites)
+    return "Sitios"
 
 @app.route('/reports')
 @login_required
 def reports():
-    visitantes = Visitor.query.all()
-    return render_template('reports.html', visitantes=visitantes)
+    return "Reportes"
 
-# ------------------------------
-# Crear base de datos y superadmin
-# ------------------------------
+@app.route('/admin/configuracion')
+@login_required
+def admin_configuracion():
+    return "Configuración"
+
+# =====================
+# INICIALIZAR DB
+# =====================
 with app.app_context():
     db.create_all()
-
-    # Crear superadmin si no existe
-    if not User.query.filter_by(email='jorgemolinabonilla@gmail.com').first():
-        u = User(
-            email='jorgemolinabonilla@gmail.com',
-            name='Super Admin',
-            role='superadmin'
+    # Crear un superadmin si no existe
+    if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
+        user = User(
+            email="jorgemolinabonilla@gmail.com",
+            name="Super Admin",
+            password_hash=generate_password_hash("Cambio123!"),
+            role="superadmin"
         )
-        u.password_hash = generate_password_hash('Cambio123!')
-        db.session.add(u)
+        db.session.add(user)
         db.session.commit()
-        print("Superadmin creado")
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
 
 
 
