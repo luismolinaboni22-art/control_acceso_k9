@@ -1,84 +1,97 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Registro de visitantes Holcim Costa Rica</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
+{% extends "base.html" %}
 
-<!-- Recuadro visitantes activos -->
-<div style="
+{% block content %}
+
+<!-- Recuadro Visitantes Activos (centrado vertical y a la derecha) -->
+<div id="recuadro-activos" style="
     position: fixed;
-    top: 20px;
+    top: 50%;
     right: 20px;
-    background-color: #007BFF;
+    transform: translateY(-50%);
+    background-color: #ED1C24;
     color: white;
     padding: 15px 25px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-weight: bold;
     font-size: 1.2em;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.3);
-    z-index: 1000;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.25);
+    z-index: 999;
+    text-align: center;
 ">
-    Visitantes en las instalaciones: {{ active_visitors_count }}
+    Visitantes en el sitio: {{ active_visitors_count }}
 </div>
 
-<header class="d-flex justify-content-between align-items-center p-3 bg-primary text-white">
-    <h1>Corporación K9</h1>
-    <nav>
-        <span>Usuario: {{ current_user.name }}</span> |
-        <a href="{{ url_for('logout') }}" class="text-white">Cerrar sesión</a>
-    </nav>
-</header>
 
-<main class="container my-4">
-    <h2>Bienvenido al Sistema K9, {{ current_user.name }}.</h2>
+<h2 class="fw-bold mb-4" style="color:#231F20;">Bienvenido {{ current_user.name }}</h2>
 
-    <div class="my-3">
-        <a href="{{ url_for('registrar') }}" class="btn btn-success">Registrar Visitante</a>
-        <a href="{{ url_for('listar') }}" class="btn btn-info">Listar Visitantes</a>
-        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Usuarios</a>
-        <a href="{{ url_for('admin_sites') }}" class="btn btn-secondary">Sitios</a>
-        <a href="{{ url_for('reports') }}" class="btn btn-warning">Reportes</a>
-        {% if current_user.role in ['superadmin','admin'] %}
-            <a href="{{ url_for('admin_configuracion') }}" class="btn btn-dark">Configuración</a>
-        {% endif %}
-    </div>
+<!-- Botones principales -->
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <a href="{{ url_for('registrar') }}" class="btn text-white fw-bold" style="background-color:#ED1C24;">Registrar Visitante</a>
+    <a href="{{ url_for('listar') }}" class="btn btn-dark fw-bold">Listar Visitantes</a>
+    <a href="{{ url_for('reports') }}" class="btn btn-secondary fw-bold">Reportes</a>
+    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-dark fw-bold">Usuarios</a>
+    <a href="{{ url_for('admin_sites') }}" class="btn btn-outline-dark fw-bold">Sitios</a>
 
-    <h3>Visitantes recientes</h3>
-    <table class="table table-striped table-bordered mt-3">
-        <thead class="table-dark">
-            <tr>
-                <th>Nombre</th>
-                <th>Cédula</th>
-                <th>Empresa</th>
-                <th>Placa</th>
-                <th>Persona a visitar</th>
-                <th>Propósito</th>
-                <th>Hora de entrada</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for v in visitantes %}
-            <tr>
-                <td>{{ v.nombre }}</td>
-                <td>{{ v.cedula }}</td>
-                <td>{{ v.empresa }}</td>
-                <td>{{ v.placa }}</td>
-                <td>{{ v.persona_visitada }}</td>
-                <td>{{ v.proposito }}</td>
-                <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="7" class="text-center">No hay visitantes registrados.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</main>
-</body>
-</html>
+    {% if current_user.role in ['superadmin', 'admin'] %}
+        <a href="{{ url_for('admin_configuracion') }}" class="btn btn-outline-danger fw-bold">Configuración</a>
+    {% endif %}
+</div>
+
+
+<h3 class="fw-bold mt-4 mb-3" style="color:#231F20;">Visitantes recientes</h3>
+
+<table class="table table-striped table-bordered shadow-sm">
+    <thead class="table-danger">
+        <tr>
+            <th>Nombre</th>
+            <th>Cédula</th>
+            <th>Empresa</th>
+            <th>Placa</th>
+            <th>Persona a visitar</th>
+            <th>Propósito</th>
+            <th>Hora de entrada</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in visitantes %}
+        <tr>
+            <td>{{ v.nombre }}</td>
+            <td>{{ v.cedula }}</td>
+            <td>{{ v.empresa }}</td>
+            <td>{{ v.placa }}</td>
+            <td>{{ v.persona_visitada }}</td>
+            <td>{{ v.proposito }}</td>
+            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="7" class="text-center">No hay visitantes registrados.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Script para actualización automática del recuadro -->
+<script>
+async function actualizarVisitantes() {
+    try {
+        const response = await fetch('{{ url_for("api_visitantes_activos") }}');
+        const data = await response.json();
+
+        const box = document.getElementById('recuadro-activos');
+        if (box) {
+            box.innerText = "Visitantes en el sitio: " + data.active_count;
+        }
+
+    } catch (e) {
+        console.error("Error actualizando visitantes:", e);
+    }
+}
+
+// actualizar cada 10 segundos
+setInterval(actualizarVisitantes, 10000);
+</script>
+
+{% endblock %}
+
 
