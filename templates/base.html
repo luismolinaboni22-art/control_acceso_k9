@@ -1,1 +1,16 @@
-<html><body>{% block content %}{% endblock %}</body></html>
+<!-- Recuadro de visitantes -->
+<div style="
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #007BFF;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.2em;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.3);
+    z-index: 1000;
+">
+    Visitantes en las instalaciones: {{ active_visitors_count }}
+</div>
