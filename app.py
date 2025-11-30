@@ -76,24 +76,46 @@ def index():
     # Visitantes activos dentro de planta
     active_visitors_count = Visitor.query.filter_by(hora_salida=None).count()
 
-    # Visitantes pendientes de salida (hoy)
+    # Visitantes pendientes de salida
     pending_count = Visitor.query.filter(
         Visitor.hora_salida.is_(None)
     ).count()
 
-    # Visitantes ingresados hoy
+    # Hoy
     today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
+
+    # Visitantes ingresados hoy
     today_count = Visitor.query.filter(
-        Visitor.hora_entrada >= datetime.combine(today, datetime.min.time())
+        Visitor.hora_entrada >= today_start
     ).count()
 
-    # Total registrados hoy (entrada + salida)
+    # Total del día (entrada + salida)
     total_today = Visitor.query.filter(
-        Visitor.hora_entrada >= datetime.combine(today, datetime.min.time())
+        Visitor.hora_entrada >= today_start
     ).count()
 
     # Últimos 10 visitantes
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
+
+    # ============================================================
+    # SISTEMA DE ALERTAS
+    # ============================================================
+    alertas = []
+
+    visitantes_sin_salida = Visitor.query.filter(
+        Visitor.hora_salida.is_(None)
+    ).all()
+
+    for v in visitantes_sin_salida:
+        horas = (datetime.utcnow() - v.hora_entrada).total_seconds() / 3600
+        if horas >= 8:
+            alertas.append(
+                f"⚠ {v.nombre} lleva más de {int(horas)} horas dentro de planta."
+            )
+
+    alertas_totales = len(alertas)
+    # ============================================================
 
     return render_template(
         'index.html',
@@ -102,7 +124,9 @@ def index():
         pending_count=pending_count,
         today_count=today_count,
         total_today=total_today,
-        visitantes=visitantes
+        visitantes=visitantes,
+        alertas=alertas,
+        alertas_totales=alertas_totales
     )
 
 
