@@ -4,6 +4,43 @@
 
 <h2 class="fw-bold mb-4">Dashboard General – Visitantes</h2>
 
+<!-- ===================== WIDGET ROJO DE ALERTAS ===================== -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow-lg p-3 text-white"
+             style="background-color:#C0392B; border-radius:10px;">
+
+            <div class="d-flex align-items-center justify-content-between">
+                <h4 class="fw-bold m-0">🔴 Alertas del Sistema</h4>
+                <h1 class="fw-bold m-0">{{ alertas_totales }}</h1>
+            </div>
+
+            {% if alertas_totales > 0 %}
+            <button class="btn btn-light btn-sm mt-3 fw-bold"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#alertasCollapse">
+                Ver detalles
+            </button>
+
+            <div class="collapse mt-3" id="alertasCollapse">
+                <ul class="list-group">
+                    {% for alerta in alertas %}
+                    <li class="list-group-item">
+                        {{ alerta }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <p class="mt-2 mb-0">No hay alertas activas.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<!-- ================== FIN WIDGET DE ALERTAS ======================= -->
+
+
 <div class="row g-4">
 
     <!-- Visitantes Activos -->
