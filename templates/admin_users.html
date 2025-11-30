@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Usuarios - Corporación K9</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <img src="{{ url_for('static', filename='images/logo.jpeg') }}" alt="Logo K9" class="logo">
+    <h1>Corporación K9</h1>
+    <nav>
+        <span>{{ current_user.name }}</span>
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+    </nav>
+</header>
+<main>
+    <h2>Usuarios</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash-message">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Rol</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.role }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Botón para agregar nuevo usuario (puedes vincular a una ruta /admin/users/new) -->
+    <a href="{{ url_for('admin_users') }}" class="menu-buttons">Agregar Usuario</a>
+</main>
+</body>
+</html>
