@@ -15,14 +15,14 @@ db.init_app(app)
 # LOGIN MANAGER
 # ---------------------------------------------------------
 login_manager = LoginManager(app)
-login_manager.login_view = 'login_view'  # coincide con la función de login
+login_manager.login_view = 'login_view'
 
 @login_manager.user_loader
 def load_user(uid):
     return User.query.get(int(uid))
 
 # ---------------------------------------------------------
-# RUTAS
+# RUTAS PRINCIPALES
 # ---------------------------------------------------------
 @app.route('/')
 @login_required
@@ -57,7 +57,7 @@ def logout():
     return redirect(url_for('login_view'))
 
 # ---------------------------------------------------------
-# RUTAS TEMPORALES PARA EL DASHBOARD
+# RUTAS TEMPORALES PARA DASHBOARD
 # ---------------------------------------------------------
 @app.route('/registrar')
 @login_required
