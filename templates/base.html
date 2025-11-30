@@ -2,20 +2,45 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Registro de visitantes Holcim Costa Rica</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-  <header class="d-flex align-items-center p-3" style="background-color: #ED1C24; color: white;">
-    <!-- Logo de Holcim -->
-    <img src="{{ url_for('static', filename='holcim_logo.svg') }}" alt="Holcim" height="50" class="me-3">
-    <h1>Registro de visitantes Holcim Costa Rica</h1>
-  </header>
+    <title>Registro de Visitantes - Holcim Costa Rica</title>
 
-  <!-- Contenedor para contenido de cada página -->
-  <main class="container my-4">
-      {% block content %}{% endblock %}
-  </main>
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- CSS corporativo -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body style="background-color:#F2F2F2;">
+
+<!-- Encabezado corporativo Holcim -->
+<header class="d-flex align-items-center shadow-sm"
+        style="background-color:#00A3E0; padding:12px 20px; color:white;">
+
+    <!-- Logo Holcim -->
+    <img src="{{ url_for('static', filename='holcim_logo.svg') }}"
+         alt="Holcim Logo"
+         style="height:50px; margin-right:20px;">
+
+    <h1 class="fw-bold" style="font-size:1.8rem;">Registro de Visitantes Holcim Costa Rica</h1>
+
+    <div class="ms-auto me-3 text-end d-none d-md-block">
+        <span style="font-weight:500;">Usuario: {{ current_user.name }}</span>
+    </div>
+
+    <a href="{{ url_for('logout') }}"
+       class="btn btn-light fw-semibold"
+       style="color:#00A3E0;">
+       Cerrar sesión
+    </a>
+
+</header>
+
+<!-- Contenedor principal -->
+<main class="container my-4">
+    {% block content %}
+    {% endblock %}
+</main>
+
 </body>
 </html>
