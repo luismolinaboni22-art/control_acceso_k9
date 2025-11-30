@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime
@@ -96,6 +96,41 @@ def listar():
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
     return render_template('listar.html', visitantes=visitantes)
 
+# =====================
+# SALIDA DE VISITANTES
+# =====================
+@app.route('/salida/<int:visitor_id>', methods=['POST'])
+@login_required
+def registrar_salida(visitor_id):
+    visitor = Visitor.query.get_or_404(visitor_id)
+    if visitor.hora_salida is None:
+        visitor.hora_salida = datetime.utcnow()
+        db.session.commit()
+        flash(f'Salida registrada para {visitor.nombre}', 'success')
+    else:
+        flash(f'La salida de {visitor.nombre} ya estaba registrada', 'warning')
+    return redirect(url_for('listar'))
+
+# =====================
+# API para actualizar visitantes activos (tiempo real)
+# =====================
+@app.route('/api/visitantes/activos')
+@login_required
+def api_visitantes_activos():
+    count = Visitor.query.filter_by(hora_salida=None).count()
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
+    visitantes_data = []
+    for v in visitantes:
+        visitantes_data.append({
+            'id': v.id,
+            'nombre': v.nombre,
+            'hora_salida': v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else None
+        })
+    return jsonify({'active_count': count, 'visitantes': visitantes_data})
+
+# =====================
+# ADMIN / CONFIG
+# =====================
 @app.route('/admin/users')
 @login_required
 def admin_users():
@@ -106,10 +141,30 @@ def admin_users():
 def admin_sites():
     return "Sitios"
 
-@app.route('/reports')
+# =====================
+# REPORTES CON FILTROS
+# =====================
+@app.route('/reports', methods=['GET'])
 @login_required
 def reports():
-    return "Reportes"
+    nombre = request.args.get('nombre', '')
+    empresa = request.args.get('empresa', '')
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+
+    query = Visitor.query
+    if nombre:
+        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
+    if empresa:
+        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
+    if desde:
+        query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
+    if hasta:
+        query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
+
+    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+    return render_template('reports.html', visitantes=visitantes,
+                           nombre=nombre, empresa=empresa, desde=desde, hasta=hasta)
 
 @app.route('/admin/configuracion')
 @login_required
@@ -121,7 +176,6 @@ def admin_configuracion():
 # =====================
 with app.app_context():
     db.create_all()
-    # Crear un superadmin si no existe
     if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
         user = User(
             email="jorgemolinabonilla@gmail.com",
