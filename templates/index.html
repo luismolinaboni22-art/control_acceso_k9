@@ -1,22 +1,75 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h3 class="mb-4 fw-bold" style="color:#2B2B2B;">Resumen de Visitantes</h3>
 
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card shadow-sm p-3">
-            <h5 class="fw-semibold">Visitantes activos</h5>
-            <p class="display-6 fw-bold" style="color:#00A3E0;">
-                {{ active_visitors_count }}
-            </p>
+<h2 class="fw-bold mb-4">Dashboard General – Visitantes</h2>
+
+<div class="row g-4">
+
+    <!-- Visitantes Activos -->
+    <div class="col-md-3">
+        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #00A3E0;">
+            <h6 class="text-muted">Visitantes en planta</h6>
+            <h2 class="fw-bold" style="color:#00A3E0;">{{ active_visitors_count }}</h2>
         </div>
     </div>
+
+    <!-- Visitantes Pendientes de Salida -->
+    <div class="col-md-3">
+        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #FF5733;">
+            <h6 class="text-muted">Pendientes de salida</h6>
+            <h2 class="fw-bold" style="color:#FF5733;">{{ pending_count }}</h2>
+        </div>
+    </div>
+
+    <!-- Visitantes Hoy -->
+    <div class="col-md-3">
+        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #2ECC71;">
+            <h6 class="text-muted">Ingresos hoy</h6>
+            <h2 class="fw-bold" style="color:#2ECC71;">{{ today_count }}</h2>
+        </div>
+    </div>
+
+    <!-- Total Hoy -->
+    <div class="col-md-3">
+        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #2B2B2B;">
+            <h6 class="text-muted">Total registrados hoy</h6>
+            <h2 class="fw-bold" style="color:#2B2B2B;">{{ total_today }}</h2>
+        </div>
+    </div>
+
 </div>
 
-<h4 class="fw-bold mb-3">Últimos Visitantes</h4>
+<hr class="my-4">
 
-<table class="table table-hover table-striped">
+<!-- BOTONES PRINCIPALES -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+
+    <a href="{{ url_for('registrar') }}"
+       class="btn btn-lg fw-bold text-white"
+       style="background-color:#00A3E0;">
+       <i class="bi bi-person-plus-fill me-2"></i> Registrar Visitante
+    </a>
+
+    <a href="{{ url_for('listar') }}"
+       class="btn btn-lg fw-bold btn-dark">
+       <i class="bi bi-people-fill me-2"></i> Ver Visitantes
+    </a>
+
+    <a href="{{ url_for('listar') }}#pendientes"
+       class="btn btn-lg fw-bold"
+       style="background-color:#FF5733; color:white;">
+       <i class="bi bi-box-arrow-left me-2"></i> Registrar Salidas Pendientes
+    </a>
+
+</div>
+
+<hr>
+
+<!-- TABLA DE ÚLTIMOS VISITANTES -->
+<h4 class="fw-bold mb-3">Últimos Visitantes Registrados</h4>
+
+<table class="table table-striped table-hover align-middle">
     <thead class="table-primary">
         <tr>
             <th>Nombre</th>
@@ -24,14 +77,15 @@
             <th>Entrada</th>
         </tr>
     </thead>
+
     <tbody>
-    {% for v in visitantes %}
+        {% for v in visitantes %}
         <tr>
             <td>{{ v.nombre }}</td>
             <td>{{ v.empresa }}</td>
             <td>{{ v.hora_entrada.strftime('%d/%m/%Y %H:%M') }}</td>
         </tr>
-    {% endfor %}
+        {% endfor %}
     </tbody>
 </table>
 
