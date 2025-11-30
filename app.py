@@ -17,3 +17,5 @@ def login():
         return render_template('login.html', error="Credenciales inválidas")
 
     return render_template('login.html')
+with app.app_context():
+    db.create_all()
