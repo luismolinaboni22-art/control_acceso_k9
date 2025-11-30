@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Configuración de usuarios</h3>
+
+<table class="table table-striped bg-white">
+  <thead>
+    <tr>
+      <th>Nombre</th>
+      <th>Email</th>
+      <th>Cambiar contraseña</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.name }}</td>
+      <td>{{ u.email }}</td>
+      <td>
+        <form method="post">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <input type="password" name="nueva_pass" class="form-control mb-1" placeholder="Nueva contraseña" required>
+          <button class="btn btn-primary btn-sm">Actualizar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
