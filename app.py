@@ -4,16 +4,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Site, Visitor
 from config import Config
 
-# ---------------------------------------------------------
-# INICIALIZAR APP
-# ---------------------------------------------------------
+# Inicializar app
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
-# ---------------------------------------------------------
-# LOGIN MANAGER
-# ---------------------------------------------------------
+# Login manager
 login_manager = LoginManager(app)
 login_manager.login_view = 'login_view'
 
@@ -21,9 +17,7 @@ login_manager.login_view = 'login_view'
 def load_user(uid):
     return User.query.get(int(uid))
 
-# ---------------------------------------------------------
-# RUTAS PRINCIPALES
-# ---------------------------------------------------------
+# Rutas principales
 @app.route('/')
 @login_required
 def index():
@@ -56,9 +50,7 @@ def logout():
     logout_user()
     return redirect(url_for('login_view'))
 
-# ---------------------------------------------------------
-# RUTAS TEMPORALES PARA DASHBOARD
-# ---------------------------------------------------------
+# Rutas del dashboard
 @app.route('/registrar')
 @login_required
 def registrar():
@@ -84,9 +76,7 @@ def admin_sites():
 def reports():
     return "Página de reportes (temporal)"
 
-# ---------------------------------------------------------
-# CREAR BASE DE DATOS Y SUPERADMIN
-# ---------------------------------------------------------
+# Crear base de datos y superadmin
 with app.app_context():
     db.create_all()
 
