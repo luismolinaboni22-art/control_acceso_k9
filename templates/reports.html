@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reportes - Corporación K9</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <img src="{{ url_for('static', filename='images/logo.jpeg') }}" alt="Logo K9" class="logo">
+    <h1>Corporación K9</h1>
+    <nav>
+        <span>{{ current_user.name }}</span>
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+    </nav>
+</header>
+<main>
+    <h2>Reportes de Visitantes</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>Empresa</th>
+                <th>Placa</th>
+                <th>Persona Visitada</th>
+                <th>Propósito</th>
+                <th>Fecha Registro</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in visitantes %}
+            <tr>
+                <td>{{ v.nombre }}</td>
+                <td>{{ v.cedula }}</td>
+                <td>{{ v.empresa }}</td>
+                <td>{{ v.placa }}</td>
+                <td>{{ v.persona_visitada }}</td>
+                <td>{{ v.proposito }}</td>
+                <td>{{ v.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</main>
+</body>
+</html>
