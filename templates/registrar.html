@@ -1,39 +1,58 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Registrar Visitante - Corporación K9</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-<header>
-    <img src="{{ url_for('static', filename='images/logo.jpeg') }}" alt="Logo K9" class="logo">
-    <h1>Corporación K9</h1>
-    <nav>
-        <span>{{ current_user.name }}</span>
-        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
-    </nav>
-</header>
-<main>
-    <h2>Registrar Visitante</h2>
+{% extends "base.html" %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        {% for category, message in messages %}
-            <div class="flash-message">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
-    {% endwith %}
+{% block content %}
 
-    <form method="POST">
-        <input type="text" name="nombre" placeholder="Nombre" required>
-        <input type="text" name="cedula" placeholder="Cédula" required>
-        <input type="text" name="empresa" placeholder="Empresa">
-        <input type="text" name="placa" placeholder="Placa del vehículo">
-        <input type="text" name="persona_visitada" placeholder="Persona a visitar">
-        <input type="text" name="proposito" placeholder="Propósito de la visita">
-        <button type="submit">Registrar</button>
+<h2 class="fw-bold mb-4" style="color:#2B2B2B;">Registrar Visitante</h2>
+
+<div class="card shadow-sm p-4" style="border-left: 6px solid #00A3E0;">
+    <form method="POST" action="{{ url_for('registrar') }}">
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Nombre completo</label>
+                <input type="text" name="nombre" class="form-control" required>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Cédula</label>
+                <input type="text" name="cedula" class="form-control">
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Empresa</label>
+                <input type="text" name="empresa" class="form-control">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Placa del vehículo</label>
+                <input type="text" name="placa" class="form-control">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Persona a visitar</label>
+            <input type="text" name="persona" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Propósito de la visita</label>
+            <textarea name="proposito" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary fw-semibold">
+                Cancelar
+            </a>
+            <button class="btn fw-semibold" 
+                    style="background-color:#00A3E0; color:white;">
+                Registrar Visitante
+            </button>
+        </div>
+
     </form>
-</main>
-</body>
-</html>
+</div>
+
+{% endblock %}
+
