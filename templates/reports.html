@@ -16,6 +16,26 @@
 </header>
 
 <main class="container my-4">
+
+<!-- Recuadro visitantes activos centrado verticalmente a la derecha -->
+<div id="recuadro-activos" style="
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    background-color: #007BFF;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.2em;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.3);
+    z-index: 1000;
+    text-align: center;
+">
+    Visitantes en las instalaciones: 0
+</div>
+
 <h2>Buscar Visitantes</h2>
 <form method="get" action="{{ url_for('reports') }}" class="row g-3 mb-4">
     <div class="col-md-3">
@@ -58,7 +78,7 @@
             <td>{{ v.persona_visitada }}</td>
             <td>{{ v.proposito }}</td>
             <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td>
+            <td id="salida-cell-{{ v.id }}">
                 {% if v.hora_salida %}
                     {{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') }}
                 {% else %}
@@ -74,6 +94,36 @@
     </tbody>
 </table>
 </main>
+
+<script>
+async function actualizarVisitantes() {
+    try {
+        const response = await fetch('{{ url_for("api_visitantes_activos") }}');
+        const data = await response.json();
+
+        // Actualizar recuadro de visitantes activos
+        const recuadro = document.getElementById('recuadro-activos');
+        if (recuadro) {
+            recuadro.innerText = "Visitantes en las instalaciones: " + data.active_count;
+        }
+
+        // Actualizar hora de salida en la tabla
+        data.visitantes.forEach(v => {
+            const cell = document.querySelector(`#salida-cell-${v.id}`);
+            if (v.hora_salida && cell) {
+                cell.innerText = v.hora_salida;
+            }
+        });
+
+    } catch (error) {
+        console.error("Error al actualizar visitantes:", error);
+    }
+}
+
+// Actualizar cada 10 segundos
+setInterval(actualizarVisitantes, 10000);
+</script>
+
 </body>
 </html>
 
