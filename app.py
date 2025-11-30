@@ -13,9 +13,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# =====================
 # MODELOS
-# =====================
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(200), unique=True, nullable=False)
@@ -35,9 +33,7 @@ class Visitor(db.Model):
     hora_entrada = db.Column(db.DateTime, default=datetime.utcnow)
     hora_salida = db.Column(db.DateTime, nullable=True)
 
-# =====================
 # LOGIN
-# =====================
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -60,9 +56,7 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# =====================
 # RUTAS PRINCIPALES
-# =====================
 @app.route('/')
 @login_required
 def index():
@@ -96,9 +90,7 @@ def listar():
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
     return render_template('listar.html', visitantes=visitantes)
 
-# =====================
 # SALIDA DE VISITANTES
-# =====================
 @app.route('/salida/<int:visitor_id>', methods=['POST'])
 @login_required
 def registrar_salida(visitor_id):
@@ -111,9 +103,7 @@ def registrar_salida(visitor_id):
         flash(f'La salida de {visitor.nombre} ya estaba registrada', 'warning')
     return redirect(url_for('listar'))
 
-# =====================
-# API para actualizar visitantes activos (tiempo real)
-# =====================
+# API visitantes activos
 @app.route('/api/visitantes/activos')
 @login_required
 def api_visitantes_activos():
@@ -128,9 +118,7 @@ def api_visitantes_activos():
         })
     return jsonify({'active_count': count, 'visitantes': visitantes_data})
 
-# =====================
 # ADMIN / CONFIG
-# =====================
 @app.route('/admin/users')
 @login_required
 def admin_users():
@@ -141,9 +129,7 @@ def admin_users():
 def admin_sites():
     return "Sitios"
 
-# =====================
 # REPORTES CON FILTROS
-# =====================
 @app.route('/reports', methods=['GET'])
 @login_required
 def reports():
@@ -171,9 +157,7 @@ def reports():
 def admin_configuracion():
     return "Configuración"
 
-# =====================
 # INICIALIZAR DB
-# =====================
 with app.app_context():
     db.create_all()
     if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
@@ -188,6 +172,7 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 
