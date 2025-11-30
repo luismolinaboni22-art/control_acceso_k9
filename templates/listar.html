@@ -1,22 +1,11 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Lista de Visitantes</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-<header>
-    <h1>Corporación K9</h1>
-    <nav>
-        <span>{{ current_user.name }}</span>
-        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
-    </nav>
-</header>
-<main>
-<h2>Visitantes Registrados</h2>
-<table>
-    <thead>
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2 class="fw-bold mb-4" style="color:#2B2B2B;">Visitantes Registrados</h2>
+
+<table class="table table-striped table-hover shadow-sm bg-white">
+    <thead style="background-color:#00A3E0; color:white;">
         <tr>
             <th>Nombre</th>
             <th>Cédula</th>
@@ -24,8 +13,12 @@
             <th>Placa</th>
             <th>Persona Visitada</th>
             <th>Propósito</th>
+            <th>Entrada</th>
+            <th>Salida</th>
+            <th>Acciones</th>
         </tr>
     </thead>
+
     <tbody>
         {% for v in visitantes %}
         <tr>
@@ -35,10 +28,37 @@
             <td>{{ v.placa }}</td>
             <td>{{ v.persona_visitada }}</td>
             <td>{{ v.proposito }}</td>
+
+            <td>
+                {{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}
+            </td>
+
+            <td>
+                {% if v.hora_salida %}
+                    <span class="text-success fw-bold">
+                        {{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') }}
+                    </span>
+                {% else %}
+                    <span class="text-danger fw-bold">Pendiente</span>
+                {% endif %}
+            </td>
+
+            <td>
+                {% if not v.hora_salida %}
+                <form action="{{ url_for('registrar_salida', visitor_id=v.id) }}" method="POST">
+                    <button class="btn btn-sm fw-semibold"
+                            style="background-color:#00A3E0; color:white;">
+                        Marcar salida
+                    </button>
+                </form>
+                {% else %}
+                    <span class="text-secondary">✓ Completado</span>
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
-</main>
-</body>
-</html>
+
+{% endblock %}
+
