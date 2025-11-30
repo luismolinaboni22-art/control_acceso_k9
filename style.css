@@ -1,14 +1,157 @@
+/************************************
+    PALETA CORPORATIVA HOLCIM
+*************************************/
+:root {
+    --holcim-blue: #00A3E0;
+    --holcim-dark: #2B2B2B;
+    --holcim-charcoal: #1A1A1A;
+    --holcim-light: #F2F2F2;
+    --holcim-white: #FFFFFF;
+    --holcim-orange: #FF6A39; /* opcional */
+}
+
+/************************************
+    ESTILO GLOBAL
+*************************************/
+body {
+    background-color: var(--holcim-light);
+    color: var(--holcim-dark);
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+h1, h2, h3, h4, h5 {
+    color: var(--holcim-dark);
+}
+
+/************************************
+    HEADER
+*************************************/
+header {
+    background-color: var(--holcim-blue) !important;
+    color: white !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+
+/************************************
+    BOTONES CORPORATIVOS
+*************************************/
+
+.btn-holcim {
+    background-color: var(--holcim-blue) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    border: none !important;
+}
+
+.btn-holcim:hover {
+    background-color: #008abd !important;
+}
+
+.btn-dark-holcim {
+    background-color: var(--holcim-dark) !important;
+    color: white !important;
+}
+
+.btn-secondary {
+    background-color: #bdbdbd !important;
+    color: var(--holcim-dark) !important;
+}
+
+/************************************
+    TABLAS CORPORATIVAS
+*************************************/
+
 table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-table, th, td {
-    border: 1px solid #ccc;
+table thead {
+    background-color: var(--holcim-blue) !important;
+    color: var(--holcim-white) !important;
+    font-weight: 600;
 }
 
-th, td {
+table tbody tr:hover {
+    background-color: #e8f9ff !important;
+}
+
+/************************************
+    TARJETAS
+*************************************/
+.card {
+    border-radius: 10px !important;
+    background-color: white;
+}
+
+.card-title {
+    color: var(--holcim-dark);
+}
+
+/************************************
+    INPUTS
+*************************************/
+input, textarea, select {
+    border-radius: 6px !important;
+    border: 1px solid #cfcfcf !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--holcim-blue) !important;
+    box-shadow: 0 0 4px rgba(0,163,224,0.3) !important;
+}
+
+/************************************
+    RECUADRO VISITANTES ACTIVOS
+*************************************/
+#recuadro-activos {
+    background-color: var(--holcim-blue) !important;
+    color: white !important;
+    border-radius: 12px !important;
+    padding: 18px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    width: 260px;
+    text-align: center;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.25);
+}
+
+/************************************
+    TABLAS DE REPORTES Y LISTADO
+*************************************/
+.table {
+    background-color: white;
+}
+
+.text-success {
+    font-weight: 600;
+}
+
+.text-danger {
+    font-weight: 600;
+}
+
+/************************************
+    MENSAJES FLASH
+*************************************/
+.alert {
+    border-radius: 8px !important;
+    font-weight: 600;
+}
+
+/************************************
+    LOGIN
+*************************************/
+.card-login {
+    border-top: 6px solid var(--holcim-blue);
+}
+
+/************************************
+    FOOTER OPCIONAL
+*************************************/
+footer {
+    text-align: center;
     padding: 10px;
-    text-align: left;
+    margin-top: 20px;
+    color: var(--holcim-dark);
 }
