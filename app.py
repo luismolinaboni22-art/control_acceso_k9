@@ -112,7 +112,8 @@ def index():
                for v in base_query.filter(Visitor.hora_salida.is_(None))
                if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
     sites = Site.query.order_by(Site.nombre).all()
-    return render_template('index.html', current_user=current_user,
+    return render_template('index.html',
+                           current_user=current_user,
                            active_visitors_count=active_visitors_count,
                            pending_count=active_visitors_count,
                            today_count=total_today,
@@ -151,61 +152,6 @@ def registrar():
     return render_template('registrar.html', sites=sites)
 
 # -----------------------------
-# REPORTES
-# -----------------------------
-@app.route('/reports', methods=['GET'])
-@login_required
-def reports():
-    nombre = request.args.get('nombre','')
-    empresa = request.args.get('empresa','')
-    desde = request.args.get('desde','')
-    hasta = request.args.get('hasta','')
-    export_csv = request.args.get('export','')
-
-    query = Visitor.query
-    if current_user.role != 'superadmin':
-        query = query.filter(Visitor.site_id == current_user.site_id)
-    if nombre:
-        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
-    if empresa:
-        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
-    if desde:
-        try:
-            query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
-        except:
-            flash('Formato de fecha "desde" inválido','warning')
-    if hasta:
-        try:
-            query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
-        except:
-            flash('Formato de fecha "hasta" inválido','warning')
-
-    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
-
-    # Export CSV
-    if export_csv.lower() == 'true':
-        def generate():
-            header = ['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida']
-            yield ','.join(header) + '\n'
-            for v in visitantes:
-                row = [
-                    v.nombre,
-                    v.empresa or '',
-                    v.cedula or '',
-                    v.placa or '',
-                    v.persona_visitada or '',
-                    v.proposito or '',
-                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
-                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
-                ]
-                yield ','.join(row) + '\n'
-        return Response(generate(), mimetype='text/csv',
-                        headers={"Content-Disposition": "attachment;filename=reportes_visitantes.csv"})
-
-    return render_template('reports.html', visitantes=visitantes,
-                           nombre=nombre, empresa=empresa, desde=desde, hasta=hasta)
-
-# -----------------------------
 # LISTAR VISITANTES
 # -----------------------------
 @app.route('/listar')
@@ -213,6 +159,34 @@ def reports():
 def listar():
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()) if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id).order_by(Visitor.hora_entrada.desc())
     return render_template('listar.html', visitantes=visitantes.all())
+
+# -----------------------------
+# REGISTRAR SALIDA
+# -----------------------------
+@app.route('/salida/<int:visitor_id>', methods=['POST'])
+@login_required
+def registrar_salida(visitor_id):
+    visitor = Visitor.query.get_or_404(visitor_id)
+    if current_user.role!='superadmin' and visitor.site_id!=current_user.site_id:
+        flash('No tiene permiso para registrar salida de este visitante','danger')
+        return redirect(url_for('listar'))
+    if visitor.hora_salida is None:
+        visitor.hora_salida = datetime.utcnow()
+        db.session.commit()
+        flash(f'Salida registrada para {visitor.nombre}','success')
+    else:
+        flash(f'La salida de {visitor.nombre} ya estaba registrada','warning')
+    return redirect(url_for('listar'))
+
+# -----------------------------
+# ADMIN USUARIOS
+# -----------------------------
+@app.route('/admin/users')
+@login_required
+@role_required('superadmin')
+def admin_users():
+    users = User.query.order_by(User.name).all()
+    return render_template('admin_users.html', users=users)
 
 # -----------------------------
 # INICIALIZAR DB + SUPERADMIN
@@ -235,7 +209,6 @@ with app.app_context():
         )
         db.session.add(super_user)
         db.session.commit()
-
 
 if __name__ == '__main__':
     app.run(debug=True)
