@@ -8,13 +8,9 @@ from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from io import BytesIO
-
-import pandas as pd
+from openpyxl import Workbook
 from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from openpyxl.styles import Font, PatternFill, Alignment
+from reportlab.pdfgen import canvas
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tu_secreto_aqui'
@@ -67,7 +63,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(200), unique=True, nullable=False)
     name = db.Column(db.String(200))
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), default="oficial")  
+    role = db.Column(db.String(50), default="oficial")  # oficial/admin/superadmin
     active = db.Column(db.Boolean, default=True)
     site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=True)
     site = db.relationship('Site', backref='users')
@@ -96,13 +92,13 @@ def load_user(user_id):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
+        email = request.form.get('email','').strip().lower()
+        password = request.form.get('password','')
         user = User.query.filter_by(email=email).first()
         if user and user.active and check_password_hash(user.password_hash, password):
             login_user(user)
             return redirect(url_for('index'))
-        flash('Credenciales inválidas o usuario inactivo', 'danger')
+        flash('Credenciales inválidas o usuario inactivo','danger')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -117,17 +113,23 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    base_query = Visitor.query if current_user.role == 'superadmin' else Visitor.query.filter_by(site_id=current_user.site_id)
+    base_query = Visitor.query if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id)
     active_visitors_count = base_query.filter(Visitor.hora_salida.is_(None)).count()
     today_start = datetime.combine(date.today(), datetime.min.time())
-    total_today = base_query.filter(Visitor.hora_entrada >= today_start).count()
+    total_today = base_query.filter(Visitor.hora_entrada>=today_start).count()
     visitantes = base_query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
     alertas = [f"⚠ {v.nombre} lleva más de {int((datetime.utcnow()-v.hora_entrada).total_seconds()/3600)} horas dentro de planta."
                for v in base_query.filter(Visitor.hora_salida.is_(None)) if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
     sites = Site.query.order_by(Site.nombre).all()
-    return render_template('index.html', current_user=current_user, active_visitors_count=active_visitors_count,
-                           pending_count=active_visitors_count, today_count=total_today, total_today=total_today,
-                           visitantes=visitantes, alertas=alertas, alertas_totales=len(alertas), sites=sites)
+    return render_template('index.html', current_user=current_user,
+                           active_visitors_count=active_visitors_count,
+                           pending_count=active_visitors_count,
+                           today_count=total_today,
+                           total_today=total_today,
+                           visitantes=visitantes,
+                           alertas=alertas,
+                           alertas_totales=len(alertas),
+                           sites=sites)
 
 # ---------------------------------------------------------------------
 # REGISTRO VISITANTES
@@ -136,10 +138,10 @@ def index():
 @login_required
 def registrar():
     sites = Site.query.filter_by(activo=True).order_by(Site.nombre).all()
-    if request.method == 'POST':
+    if request.method=='POST':
         nombre = request.form.get('nombre','').strip()
         if not nombre:
-            flash('El nombre es obligatorio', 'danger')
+            flash('El nombre es obligatorio','danger')
             return redirect(url_for('registrar'))
         site_id = int(request.form.get('site_id')) if current_user.role=='superadmin' and request.form.get('site_id') else current_user.site_id
         visitor = Visitor(
@@ -174,7 +176,7 @@ def listar():
 def registrar_salida(visitor_id):
     visitor = Visitor.query.get_or_404(visitor_id)
     if current_user.role!='superadmin' and visitor.site_id!=current_user.site_id:
-        flash('No tiene permiso para registrar salida de este visitante', 'danger')
+        flash('No tiene permiso para registrar salida de este visitante','danger')
         return redirect(url_for('listar'))
     if visitor.hora_salida is None:
         visitor.hora_salida = datetime.utcnow()
@@ -183,6 +185,104 @@ def registrar_salida(visitor_id):
     else:
         flash(f'La salida de {visitor.nombre} ya estaba registrada','warning')
     return redirect(url_for('listar'))
+
+# ---------------------------------------------------------------------
+# REPORTES
+# ---------------------------------------------------------------------
+@app.route('/reports', methods=['GET'])
+@login_required
+def reports():
+    nombre = request.args.get('nombre','')
+    empresa = request.args.get('empresa','')
+    desde = request.args.get('desde','')
+    hasta = request.args.get('hasta','')
+    site_filter = request.args.get('site','')
+    query = Visitor.query
+    if current_user.role!='superadmin':
+        query = query.filter(Visitor.site_id==current_user.site_id)
+    else:
+        if site_filter:
+            try:
+                query = query.filter(Visitor.site_id==int(site_filter))
+            except ValueError:
+                pass
+    if nombre:
+        query = query.filter(Visitor.nombre.ilike(f"%{nombre}%"))
+    if empresa:
+        query = query.filter(Visitor.empresa.ilike(f"%{empresa}%"))
+    if desde:
+        try:
+            query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
+        except Exception:
+            flash('Formato de fecha "desde" inválido', 'warning')
+    if hasta:
+        try:
+            query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
+        except Exception:
+            flash('Formato de fecha "hasta" inválido', 'warning')
+    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+    sites = Site.query.order_by(Site.nombre).all()
+    return render_template('reports.html',
+                           visitantes=visitantes,
+                           nombre=nombre,
+                           empresa=empresa,
+                           desde=desde,
+                           hasta=hasta,
+                           sites=sites,
+                           site_filter=site_filter)
+
+# ---------------------------------------------------------------------
+# EXPORTAR PDF
+# ---------------------------------------------------------------------
+@app.route('/reports/export/pdf')
+@login_required
+def export_pdf():
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = height - 40
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(30, y, "Reporte de Visitantes")
+    c.setFont("Helvetica", 10)
+    y -= 30
+    for v in visitantes:
+        line = f"{v.nombre} | {v.empresa} | {v.placa or ''} | {v.persona_visitada or ''} | {v.proposito or ''} | {v.hora_entrada} | {v.hora_salida}"
+        c.drawString(30, y, line)
+        y -= 15
+        if y < 40:
+            c.showPage()
+            y = height - 40
+    c.save()
+    buffer.seek(0)
+    return send_file(buffer, download_name="visitantes.pdf", as_attachment=True)
+
+# ---------------------------------------------------------------------
+# EXPORTAR EXCEL
+# ---------------------------------------------------------------------
+@app.route('/reports/export/excel')
+@login_required
+def export_excel():
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Visitantes"
+    headers = ["Nombre","Empresa","Placa","Persona Visitada","Propósito","Entrada","Salida"]
+    ws.append(headers)
+    for v in visitantes:
+        ws.append([
+            v.nombre,
+            v.empresa,
+            v.placa or "",
+            v.persona_visitada or "",
+            v.proposito or "",
+            v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else "",
+            v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ""
+        ])
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, download_name="visitantes.xlsx", as_attachment=True)
 
 # ---------------------------------------------------------------------
 # ADMIN USUARIOS
@@ -322,125 +422,29 @@ def admin_sites_delete(site_id):
     return redirect(url_for('admin_sites'))
 
 # ---------------------------------------------------------------------
-# REPORTES VISITANTES
+# INICIALIZAR DB + SUPERADMIN
 # ---------------------------------------------------------------------
-@app.route('/reports', methods=['GET'])
-@login_required
-def reports_view():
-    nombre = request.args.get('nombre','')
-    empresa = request.args.get('empresa','')
-    desde = request.args.get('desde','')
-    hasta = request.args.get('hasta','')
-    site_filter = request.args.get('site','')
-
-    query = Visitor.query
-
-    if current_user.role != 'superadmin':
-        query = query.filter(Visitor.site_id==current_user.site_id)
-    elif site_filter:
-        try:
-            query = query.filter(Visitor.site_id==int(site_filter))
-        except ValueError:
-            pass
-
-    if nombre:
-        query = query.filter(Visitor.nombre.ilike(f"%{nombre}%"))
-    if empresa:
-        query = query.filter(Visitor.empresa.ilike(f"%{empresa}%"))
-    if desde:
-        try:
-            query = query.filter(Visitor.hora_entrada>=datetime.fromisoformat(desde))
-        except Exception:
-            flash("Formato de fecha 'desde' inválido", "warning")
-    if hasta:
-        try:
-            query = query.filter(Visitor.hora_entrada<=datetime.fromisoformat(hasta))
-        except Exception:
-            flash("Formato de fecha 'hasta' inválido", "warning")
-
-    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
-    sites = Site.query.order_by(Site.nombre).all()
-
-    return render_template('reports.html', visitantes=visitantes, nombre=nombre,
-                           empresa=empresa, desde=desde, hasta=hasta, sites=sites,
-                           site_filter=site_filter)
+with app.app_context():
+    db.create_all()
+    default_site = Site.query.filter_by(nombre="Central").first()
+    if not default_site:
+        default_site = Site(nombre="Central", ubicacion="Sede principal", activo=True)
+        db.session.add(default_site)
+        db.session.commit()
+    if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
+        super_user = User(
+            email="jorgemolinabonilla@gmail.com",
+            name="Super Admin",
+            password_hash=generate_password_hash("Cambio123!"),
+            role="superadmin",
+            active=True,
+            site_id=default_site.id
+        )
+        db.session.add(super_user)
+        db.session.commit()
 
 # ---------------------------------------------------------------------
-# EXPORT PDF
+# RUN APP
 # ---------------------------------------------------------------------
-@app.route('/reports/export/pdf')
-@login_required
-def export_pdf():
-    args = request.args
-    query = Visitor.query
-
-    if current_user.role != 'superadmin':
-        query = query.filter(Visitor.site_id==current_user.site_id)
-    else:
-        site_filter = args.get('site','')
-        if site_filter:
-            try:
-                query = query.filter(Visitor.site_id==int(site_filter))
-            except ValueError:
-                pass
-
-    if args.get('nombre'):
-        query = query.filter(Visitor.nombre.ilike(f"%{args.get('nombre')}%"))
-    if args.get('empresa'):
-        query = query.filter(Visitor.empresa.ilike(f"%{args.get('empresa')}%"))
-    if args.get('desde'):
-        try:
-            query = query.filter(Visitor.hora_entrada>=datetime.fromisoformat(args.get('desde')))
-        except Exception:
-            pass
-    if args.get('hasta'):
-        try:
-            query = query.filter(Visitor.hora_entrada<=datetime.fromisoformat(args.get('hasta')))
-        except Exception:
-            pass
-
-    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
-    elements = []
-    styles = getSampleStyleSheet()
-    title = Paragraph("Reporte de Visitantes", styles['Title'])
-    elements.append(title)
-
-    data = [["Nombre","Empresa","Placa","Persona Visitada","Propósito","Entrada","Salida"]]
-    if current_user.role=='superadmin':
-        data[0].append("Sitio")
-
-    for v in visitantes:
-        row = [v.nombre, v.empresa, v.placa or "", v.persona_visitada or "", v.proposito or "",
-               v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else "",
-               v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ""]
-        if current_user.role=='superadmin':
-            row.append(v.site.nombre if v.site else "")
-        data.append(row)
-
-    table = Table(data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#00A3E0')),
-        ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
-        ('ALIGN',(0,0),(-1,-1),'CENTER'),
-        ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),
-        ('FONTSIZE',(0,0),(-1,0),10),
-        ('BOTTOMPADDING',(0,0),(-1,0),8),
-        ('GRID',(0,0),(-1,-1),0.5,colors.grey),
-        ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white, colors.lightgrey])
-    ]))
-    elements.append(table)
-    doc.build(elements)
-    buffer.seek(0)
-    return send_file(buffer, download_name="visitantes.pdf", as_attachment=True)
-
-# ---------------------------------------------------------------------
-# EXPORT EXCEL
-# ---------------------------------------------------------------------
-@app.route('/reports/export/excel')
-@login_required
-def export_excel():
-    args = request.args
-    query = Visitor
+if __name__ == '__main__':
+    app.run(debug=True)
