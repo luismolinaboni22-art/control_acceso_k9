@@ -8,20 +8,25 @@
         <label class="form-label">Nombre</label>
         <input type="text" name="nombre" value="{{ nombre }}" class="form-control">
     </div>
+
     <div class="col-md-3">
         <label class="form-label">Empresa</label>
         <input type="text" name="empresa" value="{{ empresa }}" class="form-control">
     </div>
+
     <div class="col-md-3">
         <label class="form-label">Desde</label>
         <input type="datetime-local" name="desde" value="{{ desde }}" class="form-control">
     </div>
+
     <div class="col-md-3">
         <label class="form-label">Hasta</label>
         <input type="datetime-local" name="hasta" value="{{ hasta }}" class="form-control">
     </div>
-    <div class="col-12 mt-2">
+
+    <div class="col-12">
         <button type="submit" class="btn btn-primary" style="background-color:#00A3E0;">Filtrar</button>
+        <a href="{{ url_for('reports', nombre=nombre, empresa=empresa, desde=desde, hasta=hasta, export='true') }}" class="btn btn-success">Descargar CSV</a>
     </div>
 </form>
 
@@ -42,11 +47,11 @@
         {% for v in visitantes %}
         <tr>
             <td>{{ v.nombre }}</td>
-            <td>{{ v.empresa }}</td>
-            <td>{{ v.cedula }}</td>
-            <td>{{ v.placa }}</td>
-            <td>{{ v.persona_visitada }}</td>
-            <td>{{ v.proposito }}</td>
+            <td>{{ v.empresa or '' }}</td>
+            <td>{{ v.cedula or '' }}</td>
+            <td>{{ v.placa or '' }}</td>
+            <td>{{ v.persona_visitada or '' }}</td>
+            <td>{{ v.proposito or '' }}</td>
             <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '' }}</td>
             <td>{{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else '' }}</td>
         </tr>
@@ -59,4 +64,3 @@
 {% endif %}
 
 {% endblock %}
-
