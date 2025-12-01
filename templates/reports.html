@@ -1,1 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3 class="fw-bold mb-4">Reportes de Visitantes</h3>
+
+<form method="GET" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Nombre</label>
+        <input type="text" name="nombre" value="{{ nombre }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Empresa</label>
+        <input type="text" name="empresa" value="{{ empresa }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Desde</label>
+        <input type="datetime-local" name="desde" value="{{ desde }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Hasta</label>
+        <input type="datetime-local" name="hasta" value="{{ hasta }}" class="form-control">
+    </div>
+    <div class="col-12 mt-2">
+        <button type="submit" class="btn btn-primary" style="background-color:#00A3E0;">Filtrar</button>
+    </div>
+</form>
+
+<table class="table table-striped">
+    <thead class="table-primary">
+        <tr>
+            <th>Nombre</th>
+            <th>Empresa</th>
+            <th>Cédula</th>
+            <th>Placa</th>
+            <th>Persona Visitada</th>
+            <th>Propósito</th>
+            <th>Hora Entrada</th>
+            <th>Hora Salida</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in visitantes %}
+        <tr>
+            <td>{{ v.nombre }}</td>
+            <td>{{ v.empresa }}</td>
+            <td>{{ v.cedula }}</td>
+            <td>{{ v.placa }}</td>
+            <td>{{ v.persona_visitada }}</td>
+            <td>{{ v.proposito }}</td>
+            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '' }}</td>
+            <td>{{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else '' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if visitantes|length == 0 %}
+<p class="text-muted">No se encontraron registros.</p>
+{% endif %}
+
+{% endblock %}
 
