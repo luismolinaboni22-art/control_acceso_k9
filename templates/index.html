@@ -1,131 +1,32 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - K9</title>
+</head>
+<body>
+    <h1>Bienvenido {{ current_user.name }}</h1>
+    <a href="{{ url_for('logout') }}">Cerrar sesión</a> |
+    <a href="{{ url_for('registrar') }}">Registrar visitante</a> |
+    <a href="{{ url_for('listar') }}">Listar visitantes</a> |
+    <a href="{{ url_for('reports') }}">Reportes</a>
 
-{% block content %}
-
-<h2 class="fw-bold mb-4">Dashboard General – Visitantes</h2>
-
-<!-- ===================== WIDGET ROJO DE ALERTAS ===================== -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card shadow-lg p-3 text-white"
-             style="background-color:#C0392B; border-radius:10px;">
-
-            <div class="d-flex align-items-center justify-content-between">
-                <h4 class="fw-bold m-0">🔴 Alertas del Sistema</h4>
-                <h1 class="fw-bold m-0">{{ alertas_totales }}</h1>
-            </div>
-
-            {% if alertas_totales > 0 %}
-            <button class="btn btn-light btn-sm mt-3 fw-bold"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#alertasCollapse">
-                Ver detalles
-            </button>
-
-            <div class="collapse mt-3" id="alertasCollapse">
-                <ul class="list-group">
-                    {% for alerta in alertas %}
-                    <li class="list-group-item">
-                        {{ alerta }}
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% else %}
-            <p class="mt-2 mb-0">No hay alertas activas.</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
-<!-- ================== FIN WIDGET DE ALERTAS ======================= -->
-
-
-<div class="row g-4">
-
-    <!-- Visitantes Activos -->
-    <div class="col-md-3">
-        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #00A3E0;">
-            <h6 class="text-muted">Visitantes en planta</h6>
-            <h2 class="fw-bold" style="color:#00A3E0;">{{ active_visitors_count }}</h2>
-        </div>
-    </div>
-
-    <!-- Visitantes Pendientes de Salida -->
-    <div class="col-md-3">
-        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #FF5733;">
-            <h6 class="text-muted">Pendientes de salida</h6>
-            <h2 class="fw-bold" style="color:#FF5733;">{{ pending_count }}</h2>
-        </div>
-    </div>
-
-    <!-- Visitantes Hoy -->
-    <div class="col-md-3">
-        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #2ECC71;">
-            <h6 class="text-muted">Ingresos hoy</h6>
-            <h2 class="fw-bold" style="color:#2ECC71;">{{ today_count }}</h2>
-        </div>
-    </div>
-
-    <!-- Total Hoy -->
-    <div class="col-md-3">
-        <div class="card shadow-sm p-3 border-0" style="border-left:6px solid #2B2B2B;">
-            <h6 class="text-muted">Total registrados hoy</h6>
-            <h2 class="fw-bold" style="color:#2B2B2B;">{{ total_today }}</h2>
-        </div>
-    </div>
-
-</div>
-
-<hr class="my-4">
-
-<!-- BOTONES PRINCIPALES -->
-<div class="d-flex flex-wrap gap-3 mb-4">
-
-    <a href="{{ url_for('registrar') }}"
-       class="btn btn-lg fw-bold text-white"
-       style="background-color:#00A3E0;">
-       <i class="bi bi-person-plus-fill me-2"></i> Registrar Visitante
-    </a>
-
-    <a href="{{ url_for('listar') }}"
-       class="btn btn-lg fw-bold btn-dark">
-       <i class="bi bi-people-fill me-2"></i> Ver Visitantes
-    </a>
-
-    <a href="{{ url_for('listar') }}#pendientes"
-       class="btn btn-lg fw-bold"
-       style="background-color:#FF5733; color:white;">
-       <i class="bi bi-box-arrow-left me-2"></i> Registrar Salidas Pendientes
-    </a>
-
-</div>
-
-<hr>
-
-<!-- TABLA DE ÚLTIMOS VISITANTES -->
-<h4 class="fw-bold mb-3">Últimos Visitantes Registrados</h4>
-
-<table class="table table-striped table-hover align-middle">
-    <thead class="table-primary">
+    <h2>Últimos visitantes</h2>
+    <table border="1">
         <tr>
             <th>Nombre</th>
             <th>Empresa</th>
-            <th>Entrada</th>
+            <th>Hora Entrada</th>
+            <th>Hora Salida</th>
         </tr>
-    </thead>
-
-    <tbody>
         {% for v in visitantes %}
         <tr>
             <td>{{ v.nombre }}</td>
             <td>{{ v.empresa }}</td>
-            <td>{{ v.hora_entrada.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else '' }}</td>
         </tr>
         {% endfor %}
-    </tbody>
-</table>
-
-{% endblock %}
-
-
+    </table>
+</body>
+</html>
