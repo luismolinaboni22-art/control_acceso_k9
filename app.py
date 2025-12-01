@@ -212,3 +212,64 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    # -----------------------------
+# REPORTES VISUALIZAR Y EXPORTAR CSV
+# -----------------------------
+@app.route('/reports', methods=['GET'])
+@login_required
+def reports():
+    nombre = request.args.get('nombre','')
+    empresa = request.args.get('empresa','')
+    desde = request.args.get('desde','')
+    hasta = request.args.get('hasta','')
+    export_csv = request.args.get('export','')
+
+    # Query base
+    query = Visitor.query
+    if current_user.role != 'superadmin':
+        query = query.filter(Visitor.site_id == current_user.site_id)
+
+    if nombre:
+        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
+    if empresa:
+        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
+    if desde:
+        try:
+            query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
+        except:
+            flash('Formato de fecha "desde" inválido','warning')
+    if hasta:
+        try:
+            query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
+        except:
+            flash('Formato de fecha "hasta" inválido','warning')
+
+    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+
+    # Exportar CSV si se solicita
+    if export_csv.lower() == 'true':
+        def generate():
+            header = ['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida']
+            yield ','.join(header) + '\n'
+            for v in visitantes:
+                row = [
+                    v.nombre,
+                    v.empresa or '',
+                    v.cedula or '',
+                    v.placa or '',
+                    v.persona_visitada or '',
+                    v.proposito or '',
+                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
+                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
+                ]
+                yield ','.join(row) + '\n'
+        return Response(generate(), mimetype='text/csv',
+                        headers={"Content-Disposition":"attachment;filename=reportes_visitantes.csv"})
+
+    return render_template('reports.html',
+                           visitantes=visitantes,
+                           nombre=nombre,
+                           empresa=empresa,
+                           desde=desde,
+                           hasta=hasta)
+
