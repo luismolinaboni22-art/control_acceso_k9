@@ -31,15 +31,6 @@ def role_required(role):
         return wrapped
     return decorator
 
-def admin_or_superadmin(f):
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        if current_user.role in ['admin','superadmin']:
-            return f(*args, **kwargs)
-        flash("No tiene permisos para acceder.", "danger")
-        return redirect(url_for('index'))
-    return wrapped
-
 # -----------------------------
 # MODELOS
 # -----------------------------
@@ -108,20 +99,11 @@ def index():
     today_start = datetime.combine(date.today(), datetime.min.time())
     total_today = base_query.filter(Visitor.hora_entrada>=today_start).count()
     visitantes = base_query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
-    alertas = [f"⚠ {v.nombre} lleva más de {int((datetime.utcnow()-v.hora_entrada).total_seconds()/3600)} horas dentro de planta."
-               for v in base_query.filter(Visitor.hora_salida.is_(None))
-               if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
-    sites = Site.query.order_by(Site.nombre).all()
     return render_template('index.html',
-                           current_user=current_user,
-                           active_visitors_count=active_visitors_count,
-                           pending_count=active_visitors_count,
-                           today_count=total_today,
-                           total_today=total_today,
                            visitantes=visitantes,
-                           alertas=alertas,
-                           alertas_totales=len(alertas),
-                           sites=sites)
+                           active_visitors_count=active_visitors_count,
+                           today_count=total_today,
+                           total_today=total_today)
 
 # -----------------------------
 # REGISTRAR VISITANTES
@@ -179,14 +161,58 @@ def registrar_salida(visitor_id):
     return redirect(url_for('listar'))
 
 # -----------------------------
-# ADMIN USUARIOS
+# REPORTES (nombre, empresa, fechas) + CSV
 # -----------------------------
-@app.route('/admin/users')
+@app.route('/reports', methods=['GET'])
 @login_required
-@role_required('superadmin')
-def admin_users():
-    users = User.query.order_by(User.name).all()
-    return render_template('admin_users.html', users=users)
+def reports():
+    nombre = request.args.get('nombre','')
+    empresa = request.args.get('empresa','')
+    desde = request.args.get('desde','')
+    hasta = request.args.get('hasta','')
+    export_csv = request.args.get('export','')
+
+    query = Visitor.query
+    if current_user.role!='superadmin':
+        query = query.filter(Visitor.site_id==current_user.site_id)
+    if nombre:
+        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
+    if empresa:
+        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
+    if desde:
+        try:
+            query = query.filter(Visitor.hora_entrada>=datetime.fromisoformat(desde))
+        except:
+            flash('Formato de fecha "desde" inválido','warning')
+    if hasta:
+        try:
+            query = query.filter(Visitor.hora_entrada<=datetime.fromisoformat(hasta))
+        except:
+            flash('Formato de fecha "hasta" inválido','warning')
+
+    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+
+    # Exportar CSV
+    if export_csv.lower()=='true':
+        def generate():
+            header = ['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida']
+            yield ','.join(header)+'\n'
+            for v in visitantes:
+                row = [
+                    v.nombre,
+                    v.empresa or '',
+                    v.cedula or '',
+                    v.placa or '',
+                    v.persona_visitada or '',
+                    v.proposito or '',
+                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
+                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
+                ]
+                yield ','.join(row)+'\n'
+        return Response(generate(), mimetype='text/csv',
+                        headers={"Content-Disposition":"attachment;filename=reportes_visitantes.csv"})
+
+    return render_template('reports.html', visitantes=visitantes, nombre=nombre, empresa=empresa, desde=desde, hasta=hasta)
 
 # -----------------------------
 # INICIALIZAR DB + SUPERADMIN
