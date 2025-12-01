@@ -1,64 +1,202 @@
-{% extends "base.html" %}
+from flask import Flask, render_template, redirect, url_for, request, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from datetime import datetime, date
 
-{% block content %}
-<h2 class="fw-bold mb-4">Administración de Usuarios</h2>
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'tu_secreto_aqui'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///visitas.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-<a href="{{ url_for('admin_users_new') }}" class="btn btn-success mb-3">
-    <i class="bi bi-person-plus"></i> Crear usuario
-</a>
+db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
-<table class="table table-striped table-hover align-middle">
-    <thead class="table-dark">
-        <tr>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th class="text-center">Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for u in users %}
-        <tr>
-            <td>{{ u.name }}</td>
-            <td>{{ u.email }}</td>
-            <td>{{ u.role }}</td>
-            <td>
-                {% if u.active %}
-                    <span class="badge bg-success">Activo</span>
-                {% else %}
-                    <span class="badge bg-danger">Inactivo</span>
-                {% endif %}
-            </td>
+# -----------------------------
+# MODELOS
+# -----------------------------
+class Site(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), nullable=False)
+    ubicacion = db.Column(db.String(300))
+    activo = db.Column(db.Boolean, default=True)
 
-            <td class="text-center">
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    name = db.Column(db.String(200))
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(50), default="oficial")
+    active = db.Column(db.Boolean, default=True)
+    site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=True)
+    site = db.relationship('Site', backref='users')
 
-                <!-- EDITAR -->
-                <a href="{{ url_for('admin_users_edit', user_id=u.id) }}"
-                   class="btn btn-primary btn-sm">
-                    <i class="bi bi-pencil"></i>
-                </a>
+class Visitor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), nullable=False)
+    empresa = db.Column(db.String(200))
+    hora_entrada = db.Column(db.DateTime, default=datetime.utcnow)
+    hora_salida = db.Column(db.DateTime, nullable=True)
+    site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=True)
+    site = db.relationship('Site', backref='visitantes')
 
-                <!-- ACTIVAR / DESACTIVAR -->
-                <a href="{{ url_for('admin_users_toggle', user_id=u.id) }}"
-                   class="btn btn-warning btn-sm">
-                    {% if u.active %}<i class="bi bi-x-circle"></i>{% else %}<i class="bi bi-check-circle"></i>{% endif %}
-                </a>
 
-                <!-- ELIMINAR -->
-                <form action="{{ url_for('admin_users_delete', user_id=u.id) }}"
-                    method="POST" style="display:inline-block;"
-                    onsubmit="return confirm('¿Seguro que deseas eliminar este usuario?')">
+# -----------------------------
+# DECORADORES
+# -----------------------------
+def role_required(role):
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if not current_user.is_authenticated:
+                flash("No tiene permisos para acceder.", "danger")
+                return redirect(url_for('login'))
+            if current_user.role == role or current_user.role == 'superadmin':
+                return f(*args, **kwargs)
+            flash("No tiene permisos para acceder.", "danger")
+            return redirect(url_for('index'))
+        return wrapped
+    return decorator
 
-                    <button class="btn btn-danger btn-sm">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </form>
 
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+# -----------------------------
+# LOGIN
+# -----------------------------
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
-{% endblock %}
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email','').strip().lower()
+        password = request.form.get('password','')
+        user = User.query.filter_by(email=email).first()
+        if user and user.active and check_password_hash(user.password_hash,password):
+            login_user(user)
+            return redirect(url_for('index'))
+        flash('Credenciales inválidas o usuario inactivo','danger')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+
+# -----------------------------
+# DASHBOARD
+# -----------------------------
+@app.route('/')
+@login_required
+def index():
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
+    return render_template('index.html', visitantes=visitantes)
+
+
+# -----------------------------
+# REGISTRAR VISITANTES
+# -----------------------------
+@app.route('/registrar', methods=['GET','POST'])
+@login_required
+def registrar():
+    if request.method=='POST':
+        nombre = request.form.get('nombre','').strip()
+        if not nombre:
+            flash('El nombre es obligatorio','danger')
+            return redirect(url_for('registrar'))
+        visitor = Visitor(nombre=nombre)
+        db.session.add(visitor)
+        db.session.commit()
+        flash('Visitante registrado con éxito','success')
+        return redirect(url_for('index'))
+    return render_template('registrar.html')
+
+
+# -----------------------------
+# LISTAR VISITANTES
+# -----------------------------
+@app.route('/listar')
+@login_required
+def listar():
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
+    return render_template('listar.html', visitantes=visitantes)
+
+
+# -----------------------------
+# ADMIN USERS
+# -----------------------------
+@app.route('/admin/users')
+@login_required
+@role_required('superadmin')
+def admin_users():
+    users = User.query.order_by(User.name.asc()).all()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/users/new', methods=['GET','POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_new():
+    if request.method=='POST':
+        email = request.form.get('email','').strip().lower()
+        name = request.form.get('name','').strip()
+        password = request.form.get('password','')
+        if not email or not name or not password:
+            flash('Todos los campos son obligatorios','danger')
+            return redirect(url_for('admin_users_new'))
+        user = User(email=email, name=name, password_hash=generate_password_hash(password), role='oficial')
+        db.session.add(user)
+        db.session.commit()
+        flash('Usuario creado','success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin_user_form.html', action='create', user=None)
+
+@app.route('/admin/users/edit/<int:user_id>', methods=['GET','POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_edit(user_id):
+    user = User.query.get_or_404(user_id)
+    if request.method=='POST':
+        user.email = request.form.get('email','').strip()
+        user.name = request.form.get('name','').strip()
+        db.session.commit()
+        flash('Usuario actualizado','success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin_user_form.html', action='edit', user=user)
+
+@app.route('/admin/users/toggle/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_toggle(user_id):
+    user = User.query.get_or_404(user_id)
+    user.active = not user.active
+    db.session.commit()
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_delete(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    return redirect(url_for('admin_users'))
+
+
+# -----------------------------
+# INICIALIZAR DB + SUPERADMIN
+# -----------------------------
+with app.app_context():
+    db.create_all()
+    if not User.query.filter_by(email="super@admin.com").first():
+        super_user = User(email="super@admin.com", name="Super Admin", password_hash=generate_password_hash("admin123!"), role="superadmin")
+        db.session.add(super_user)
+        db.session.commit()
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
