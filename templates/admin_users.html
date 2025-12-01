@@ -1,51 +1,88 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Usuarios - Corporación K9</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-<header>
-    <img src="{{ url_for('static', filename='images/logo.jpeg') }}" alt="Logo K9" class="logo">
-    <h1>Corporación K9</h1>
-    <nav>
-        <span>{{ current_user.name }}</span>
-        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
-    </nav>
-</header>
-<main>
-    <h2>Usuarios</h2>
+{% extends "base.html" %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
+{% block content %}
+
+<h2 class="fw-bold mb-4">Administración de Usuarios</h2>
+
+<!-- Mensajes -->
+{% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
         {% for category, message in messages %}
-            <div class="flash-message">{{ message }}</div>
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
         {% endfor %}
     {% endif %}
-    {% endwith %}
+{% endwith %}
 
-    <table>
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Rol</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr>
-                <td>{{ user.name }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.role }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- BOTÓN NUEVO USUARIO -->
+<div class="mb-4">
+    <a href="{{ url_for('admin_new_user') }}"
+       class="btn btn-success btn-lg fw-bold">
+       <i class="bi bi-person-plus-fill me-2"></i> Agregar Usuario
+    </a>
+</div>
 
-    <!-- Botón para agregar nuevo usuario (puedes vincular a una ruta /admin/users/new) -->
-    <a href="{{ url_for('admin_users') }}" class="menu-buttons">Agregar Usuario</a>
-</main>
-</body>
-</html>
+<!-- TABLA DE USUARIOS -->
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white fw-bold">
+        Lista de Usuarios
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover table-striped align-middle mb-0">
+            <thead class="table-primary">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        {% if user.role == "superadmin" %}
+                            <span class="badge bg-danger">Super Admin</span>
+                        {% elif user.role == "admin" %}
+                            <span class="badge bg-primary">Admin</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Oficial</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.active %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-dark">Suspendido</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- ACCIONES -->
+                    <td class="text-center">
+                        <a href="{{ url_for('admin_edit_user', user_id=user.id) }}"
+                            class="btn btn-warning btn-sm">
+                            <i class="bi bi-pencil-fill"></i>
+                        </a>
+
+                        {% if user.role != "superadmin" %}
+                        <a href="{{ url_for('admin_toggle_user', user_id=user.id) }}"
+                            class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-x-circle"></i>
+                        </a>
+                        {% endif %}
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
