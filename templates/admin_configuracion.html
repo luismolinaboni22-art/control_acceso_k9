@@ -1,29 +1,25 @@
-{% extends 'base.html' %}
-{% block content %}
-<h3>Configuración de usuarios</h3>
+{% extends "base.html" %}
 
-<table class="table table-striped bg-white">
-  <thead>
-    <tr>
-      <th>Nombre</th>
-      <th>Email</th>
-      <th>Cambiar contraseña</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for u in users %}
-    <tr>
-      <td>{{ u.name }}</td>
-      <td>{{ u.email }}</td>
-      <td>
-        <form method="post">
-          <input type="hidden" name="user_id" value="{{ u.id }}">
-          <input type="password" name="nueva_pass" class="form-control mb-1" placeholder="Nueva contraseña" required>
-          <button class="btn btn-primary btn-sm">Actualizar</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% block content %}
+
+<h2 class="fw-bold mb-4">Configuración del Sistema</h2>
+
+<div class="card shadow-sm p-4">
+
+    <h5 class="fw-bold mb-3">Parámetros Generales</h5>
+
+    <p class="text-muted">Este módulo permitirá ajustar opciones globales del sistema.</p>
+
+    <hr>
+
+    <h6 class="fw-bold">Opciones disponibles próximamente:</h6>
+    <ul>
+        <li>Configurar tiempos máximos de permanencia</li>
+        <li>Configurar alertas del sistema</li>
+        <li>Configurar colores / branding</li>
+        <li>Registro de auditoría</li>
+    </ul>
+
+</div>
+
 {% endblock %}
