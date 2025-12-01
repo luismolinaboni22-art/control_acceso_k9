@@ -1,78 +1,62 @@
-# -----------------------------
-# REPORTES + EXPORTAR CSV
-# -----------------------------
-@app.route('/reports', methods=['GET'])
-@login_required
-def reports():
-    # Obtener filtros del formulario o URL
-    nombre = request.args.get('nombre', '').strip()
-    empresa = request.args.get('empresa', '').strip()
-    desde = request.args.get('desde', '').strip()
-    hasta = request.args.get('hasta', '').strip()
-    export_csv = request.args.get('export', '').strip().lower()
+{% extends "base.html" %}
 
-    # Query base
-    query = Visitor.query
-    if current_user.role != 'superadmin':
-        query = query.filter(Visitor.site_id == current_user.site_id)
+{% block content %}
+<h3 class="fw-bold mb-4">Reportes de Visitantes</h3>
 
-    # Aplicar filtros
-    if nombre:
-        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
-    if empresa:
-        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
-    if desde:
-        try:
-            desde_dt = datetime.fromisoformat(desde)
-            query = query.filter(Visitor.hora_entrada >= desde_dt)
-        except ValueError:
-            flash('Formato de fecha "desde" inválido', 'warning')
-    if hasta:
-        try:
-            hasta_dt = datetime.fromisoformat(hasta)
-            query = query.filter(Visitor.hora_entrada <= hasta_dt)
-        except ValueError:
-            flash('Formato de fecha "hasta" inválido', 'warning')
+<form method="GET" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Nombre</label>
+        <input type="text" name="nombre" value="{{ nombre }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Empresa</label>
+        <input type="text" name="empresa" value="{{ empresa }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Desde</label>
+        <input type="datetime-local" name="desde" value="{{ desde }}" class="form-control">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Hasta</label>
+        <input type="datetime-local" name="hasta" value="{{ hasta }}" class="form-control">
+    </div>
+    <div class="col-12 mt-2">
+        <button type="submit" class="btn btn-primary" style="background-color:#00A3E0;">Filtrar</button>
+        <a href="{{ url_for('reports', nombre=nombre, empresa=empresa, desde=desde, hasta=hasta, export='true') }}" class="btn btn-success">Descargar CSV</a>
+    </div>
+</form>
 
-    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+<table class="table table-striped">
+    <thead class="table-primary">
+        <tr>
+            <th>Nombre</th>
+            <th>Empresa</th>
+            <th>Cédula</th>
+            <th>Placa</th>
+            <th>Persona Visitada</th>
+            <th>Propósito</th>
+            <th>Hora Entrada</th>
+            <th>Hora Salida</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in visitantes %}
+        <tr>
+            <td>{{ v.nombre }}</td>
+            <td>{{ v.empresa or '' }}</td>
+            <td>{{ v.cedula or '' }}</td>
+            <td>{{ v.placa or '' }}</td>
+            <td>{{ v.persona_visitada or '' }}</td>
+            <td>{{ v.proposito or '' }}</td>
+            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '' }}</td>
+            <td>{{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else '' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
-    # EXPORTAR CSV
-    if export_csv == 'true':
-        import io
-        import csv
+{% if visitantes|length == 0 %}
+<p class="text-muted">No se encontraron registros.</p>
+{% endif %}
 
-        def generate():
-            data = io.StringIO()
-            writer = csv.writer(data)
-            # Cabecera CSV
-            writer.writerow(['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida'])
-            yield data.getvalue()
-            data.seek(0)
-            data.truncate(0)
-            # Filas de visitantes
-            for v in visitantes:
-                writer.writerow([
-                    v.nombre,
-                    v.empresa or '',
-                    v.cedula or '',
-                    v.placa or '',
-                    v.persona_visitada or '',
-                    v.proposito or '',
-                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
-                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
-                ])
-                yield data.getvalue()
-                data.seek(0)
-                data.truncate(0)
-
-        return Response(generate(),
-                        mimetype='text/csv',
-                        headers={"Content-Disposition":"attachment;filename=reportes_visitantes.csv"})
-
-    # Renderizar HTML si no es exportación
-    return render_template('reports.html',
-                           visitantes=visitantes,
-                           nombre=nombre,
-                           empresa=empresa,
-                           desde=desde,
-                           hasta=hasta)
+{% endblock %}
