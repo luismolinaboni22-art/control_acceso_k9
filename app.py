@@ -1,10 +1,9 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, Response
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-import csv
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tu_secreto_aqui'
@@ -47,7 +46,6 @@ def admin_or_superadmin(f):
 # MODELOS
 # -----------------------------
 class Site(db.Model):
-    __tablename__ = 'site'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     ubicacion = db.Column(db.String(300))
@@ -55,7 +53,6 @@ class Site(db.Model):
 
 
 class User(UserMixin, db.Model):
-    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(200), unique=True, nullable=False)
     name = db.Column(db.String(200))
@@ -67,7 +64,6 @@ class User(UserMixin, db.Model):
 
 
 class Visitor(db.Model):
-    __tablename__ = 'visitor'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     cedula = db.Column(db.String(100))
@@ -206,12 +202,6 @@ def reports():
     hasta = request.args.get('hasta','')
     export_csv = request.args.get('export','')
 
-    # Ajuste de datetime-local
-    if desde:
-        desde = desde.replace('T',' ')
-    if hasta:
-        hasta = hasta.replace('T',' ')
-
     query = Visitor.query
     if current_user.role!='superadmin':
         query = query.filter(Visitor.site_id==current_user.site_id)
@@ -279,4 +269,4 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)
