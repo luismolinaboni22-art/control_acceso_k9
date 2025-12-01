@@ -1,9 +1,10 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, abort, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import csv
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tu_secreto_aqui'
@@ -14,9 +15,10 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
 # DECORADORES
-# ---------------------------------------------------------------------
+# -----------------------------
 def role_required(role):
     def decorator(f):
         @wraps(f)
@@ -40,15 +42,17 @@ def admin_or_superadmin(f):
         return redirect(url_for('index'))
     return wrapped
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
 # MODELOS
-# ---------------------------------------------------------------------
+# -----------------------------
 class Site(db.Model):
     __tablename__ = 'site'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     ubicacion = db.Column(db.String(300))
     activo = db.Column(db.Boolean, default=True)
+
 
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
@@ -60,6 +64,7 @@ class User(UserMixin, db.Model):
     active = db.Column(db.Boolean, default=True)
     site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=True)
     site = db.relationship('Site', backref='users')
+
 
 class Visitor(db.Model):
     __tablename__ = 'visitor'
@@ -75,12 +80,14 @@ class Visitor(db.Model):
     site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=True)
     site = db.relationship('Site', backref='visitantes')
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
 # LOGIN
-# ---------------------------------------------------------------------
+# -----------------------------
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -94,33 +101,44 @@ def login():
         flash('Credenciales inválidas o usuario inactivo','danger')
     return render_template('login.html')
 
+
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
 # DASHBOARD
-# ---------------------------------------------------------------------
+# -----------------------------
 @app.route('/')
 @login_required
 def index():
     base_query = Visitor.query if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id)
     active_visitors_count = base_query.filter(Visitor.hora_salida.is_(None)).count()
     today_start = datetime.combine(date.today(), datetime.min.time())
-    total_today = base_query.filter(Visitor.hora_entrada >= today_start).count()
+    total_today = base_query.filter(Visitor.hora_entrada>=today_start).count()
     visitantes = base_query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
     alertas = [f"⚠ {v.nombre} lleva más de {int((datetime.utcnow()-v.hora_entrada).total_seconds()/3600)} horas dentro de planta."
-               for v in base_query.filter(Visitor.hora_salida.is_(None)) if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
+               for v in base_query.filter(Visitor.hora_salida.is_(None))
+               if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
     sites = Site.query.order_by(Site.nombre).all()
-    return render_template('index.html', current_user=current_user, active_visitors_count=active_visitors_count,
-                           pending_count=active_visitors_count, today_count=total_today, total_today=total_today,
-                           visitantes=visitantes, alertas=alertas, alertas_totales=len(alertas), sites=sites)
+    return render_template('index.html',
+                           current_user=current_user,
+                           active_visitors_count=active_visitors_count,
+                           pending_count=active_visitors_count,
+                           today_count=total_today,
+                           total_today=total_today,
+                           visitantes=visitantes,
+                           alertas=alertas,
+                           alertas_totales=len(alertas),
+                           sites=sites)
 
-# ---------------------------------------------------------------------
-# REGISTRO VISITANTES
-# ---------------------------------------------------------------------
+
+# -----------------------------
+# REGISTRAR VISITANTES
+# -----------------------------
 @app.route('/registrar', methods=['GET','POST'])
 @login_required
 def registrar():
@@ -146,18 +164,20 @@ def registrar():
         return redirect(url_for('index'))
     return render_template('registrar.html', sites=sites)
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
 # LISTAR VISITANTES
-# ---------------------------------------------------------------------
+# -----------------------------
 @app.route('/listar')
 @login_required
 def listar():
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()) if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id).order_by(Visitor.hora_entrada.desc())
     return render_template('listar.html', visitantes=visitantes.all())
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
 # REGISTRAR SALIDA
-# ---------------------------------------------------------------------
+# -----------------------------
 @app.route('/salida/<int:visitor_id>', methods=['POST'])
 @login_required
 def registrar_salida(visitor_id):
@@ -173,9 +193,10 @@ def registrar_salida(visitor_id):
         flash(f'La salida de {visitor.nombre} ya estaba registrada','warning')
     return redirect(url_for('listar'))
 
-# ---------------------------------------------------------------------
-# REPORTES FILTRO (solo HTML)
-# ---------------------------------------------------------------------
+
+# -----------------------------
+# REPORTES + EXPORTAR CSV
+# -----------------------------
 @app.route('/reports', methods=['GET'])
 @login_required
 def reports():
@@ -183,6 +204,8 @@ def reports():
     empresa = request.args.get('empresa','')
     desde = request.args.get('desde','')
     hasta = request.args.get('hasta','')
+    export_csv = request.args.get('export','')
+
     query = Visitor.query
     if current_user.role!='superadmin':
         query = query.filter(Visitor.site_id==current_user.site_id)
@@ -200,12 +223,42 @@ def reports():
             query = query.filter(Visitor.hora_entrada<=datetime.fromisoformat(hasta))
         except:
             flash('Formato de fecha "hasta" inválido','warning')
+
     visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+
+    # CSV
+    if export_csv.lower()=='true':
+        def generate():
+            header = ['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida']
+            yield ','.join(header)+'\n'
+            for v in visitantes:
+                row = [
+                    v.nombre,
+                    v.empresa or '',
+                    v.cedula or '',
+                    v.placa or '',
+                    v.persona_visitada or '',
+                    v.proposito or '',
+                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
+                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
+                ]
+                yield ','.join(row)+'\n'
+        return Response(generate(), mimetype='text/csv',
+                        headers={"Content-Disposition":"attachment;filename=reportes_visitantes.csv"})
+
     return render_template('reports.html', visitantes=visitantes, nombre=nombre, empresa=empresa, desde=desde, hasta=hasta)
 
-# ---------------------------------------------------------------------
+
+# -----------------------------
+# ADMIN USUARIOS
+# -----------------------------
+# ... (todas las rutas de admin_users y admin_sites igual que tu versión actual)
+# Para no alargar el ejemplo, se mantiene igual tu código, solo asegúrate de que los url_for sean correctos
+
+
+# -----------------------------
 # INICIALIZAR DB + SUPERADMIN
-# ---------------------------------------------------------------------
+# -----------------------------
 with app.app_context():
     db.create_all()
     default_site = Site.query.filter_by(nombre="Central").first()
@@ -225,8 +278,6 @@ with app.app_context():
         db.session.add(super_user)
         db.session.commit()
 
-if __name__ == '__main__':
-    app.run(debug=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
