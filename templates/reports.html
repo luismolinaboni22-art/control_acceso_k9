@@ -1,47 +1,41 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reportes - K9</title>
+</head>
+<body>
+    <h1>Reportes de Visitantes</h1>
+    <a href="{{ url_for('index') }}">Volver al Dashboard</a>
 
-{% block content %}
-<h3>Reportes de Visitantes</h3>
+    <form method="GET">
+        <label>Nombre:</label>
+        <input type="text" name="nombre" value="{{ nombre }}">
+        <label>Empresa:</label>
+        <input type="text" name="empresa" value="{{ empresa }}">
+        <label>Desde:</label>
+        <input type="datetime-local" name="desde" value="{{ desde }}">
+        <label>Hasta:</label>
+        <input type="datetime-local" name="hasta" value="{{ hasta }}">
+        <button type="submit">Filtrar</button>
+        <a href="{{ url_for('reports', nombre=nombre, empresa=empresa, desde=desde, hasta=hasta, export='true') }}">Exportar CSV</a>
+    </form>
 
-<form method="GET" class="mb-4">
-    Nombre: <input type="text" name="nombre" value="{{ nombre }}">
-    Empresa: <input type="text" name="empresa" value="{{ empresa }}">
-    Desde: <input type="datetime-local" name="desde" value="{{ desde }}">
-    Hasta: <input type="datetime-local" name="hasta" value="{{ hasta }}">
-    <button type="submit">Filtrar</button>
-</form>
-
-<table border="1" cellpadding="5" cellspacing="0">
-    <thead>
+    <table border="1">
         <tr>
             <th>Nombre</th>
             <th>Empresa</th>
-            <th>Cédula</th>
-            <th>Placa</th>
-            <th>Persona Visitada</th>
-            <th>Propósito</th>
             <th>Hora Entrada</th>
             <th>Hora Salida</th>
         </tr>
-    </thead>
-    <tbody>
         {% for v in visitantes %}
         <tr>
             <td>{{ v.nombre }}</td>
             <td>{{ v.empresa }}</td>
-            <td>{{ v.cedula }}</td>
-            <td>{{ v.placa }}</td>
-            <td>{{ v.persona_visitada }}</td>
-            <td>{{ v.proposito }}</td>
-            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '' }}</td>
+            <td>{{ v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else '' }}</td>
         </tr>
         {% endfor %}
-        {% if visitantes|length == 0 %}
-        <tr>
-            <td colspan="8">No se encontraron registros.</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
-{% endblock %}
+    </table>
+</body>
+</html>
