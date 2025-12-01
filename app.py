@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, abort, Response
+from flask import Flask, render_template, redirect, url_for, request, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
@@ -206,6 +206,12 @@ def reports():
     hasta = request.args.get('hasta','')
     export_csv = request.args.get('export','')
 
+    # Ajuste de datetime-local
+    if desde:
+        desde = desde.replace('T',' ')
+    if hasta:
+        hasta = hasta.replace('T',' ')
+
     query = Visitor.query
     if current_user.role!='superadmin':
         query = query.filter(Visitor.site_id==current_user.site_id)
@@ -250,13 +256,6 @@ def reports():
 
 
 # -----------------------------
-# ADMIN USUARIOS
-# -----------------------------
-# ... (todas las rutas de admin_users y admin_sites igual que tu versión actual)
-# Para no alargar el ejemplo, se mantiene igual tu código, solo asegúrate de que los url_for sean correctos
-
-
-# -----------------------------
 # INICIALIZAR DB + SUPERADMIN
 # -----------------------------
 with app.app_context():
@@ -280,4 +279,4 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
