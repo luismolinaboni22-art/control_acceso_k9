@@ -1,45 +1,27 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar Visitante - K9</title>
+</head>
+<body>
+    <h1>Registrar Visitante</h1>
+    <a href="{{ url_for('index') }}">Volver al Dashboard</a>
 
-{% block content %}
-<h3 class="fw-bold mb-4">Registrar Visitante</h3>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div>{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-<form method="POST">
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <label class="form-label">Nombre</label>
-            <input type="text" name="nombre" class="form-control" required>
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Cédula</label>
-            <input type="text" name="cedula" class="form-control">
-        </div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <label class="form-label">Empresa</label>
-            <input type="text" name="empresa" class="form-control">
-        </div>
-
-        <div class="col-md-6">
-            <label class="form-label">Placa</label>
-            <input type="text" name="placa" class="form-control">
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Persona a visitar</label>
-        <input type="text" name="persona" class="form-control">
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Propósito</label>
-        <textarea name="proposito" class="form-control"></textarea>
-    </div>
-
-    <button class="btn btn-primary" style="background-color:#00A3E0;">Registrar</button>
-</form>
-
-{% endblock %}
-
+    <form method="POST">
+        <label>Nombre:</label><br>
+        <input type="text" name="nombre" required><br><br>
+        <label>Empresa:</label><br>
+        <input type="text" name="empresa"><br><br>
+        <button type="submit">Registrar</button>
+    </form>
+</body>
+</html>
