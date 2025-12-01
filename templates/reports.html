@@ -4,7 +4,6 @@
 
 <h3 class="fw-bold mb-4">Reportes de Visitantes</h3>
 
-<!-- Formulario de filtros -->
 <form method="GET" class="row g-3 mb-4">
     <div class="col-md-3">
         <label class="form-label">Nombre</label>
@@ -40,14 +39,13 @@
 
     <div class="col-12 mt-2">
         <button class="btn btn-primary" style="background-color:#00A3E0;">Filtrar</button>
-        <a href="{{ url_for('export_excel') }}" class="btn btn-success ms-2">Exportar Excel</a>
-        <a href="{{ url_for('export_pdf') }}" class="btn btn-danger ms-2">Exportar PDF</a>
+        <a href="{{ url_for('export_excel') }}?{{ request.query_string.decode('utf-8') }}" class="btn btn-success ms-2">Exportar Excel</a>
+        <a href="{{ url_for('export_pdf') }}?{{ request.query_string.decode('utf-8') }}" class="btn btn-danger ms-2">Exportar PDF</a>
     </div>
 </form>
 
-<!-- Tabla de visitantes -->
 <div class="table-responsive mt-3">
-    <table class="table table-striped table-bordered">
+    <table id="visitantesTable" class="table table-striped table-bordered">
         <thead class="table-primary">
             <tr>
                 <th>Nombre</th>
@@ -82,3 +80,16 @@
 </div>
 
 {% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        $('#visitantesTable').DataTable({
+            "order": [[5, "desc"]],
+            "pageLength": 25,
+            "lengthMenu": [10, 25, 50, 100]
+        });
+    });
+</script>
+{% endblock %}
+
