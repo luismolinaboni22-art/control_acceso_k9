@@ -1,15 +1,9 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, abort, send_file
+from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from io import BytesIO, StringIO
-import csv
-
-# PDF
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tu_secreto_aqui'
@@ -180,7 +174,7 @@ def registrar_salida(visitor_id):
     return redirect(url_for('listar'))
 
 # ---------------------------------------------------------------------
-# REPORTES FILTRO + DESCARGAS
+# REPORTES FILTRO (solo HTML)
 # ---------------------------------------------------------------------
 @app.route('/reports', methods=['GET'])
 @login_required
@@ -189,17 +183,9 @@ def reports():
     empresa = request.args.get('empresa','')
     desde = request.args.get('desde','')
     hasta = request.args.get('hasta','')
-    site_filter = request.args.get('site','')
     query = Visitor.query
     if current_user.role!='superadmin':
         query = query.filter(Visitor.site_id==current_user.site_id)
-    else:
-        if site_filter:
-            try:
-                sid = int(site_filter)
-                query = query.filter(Visitor.site_id==sid)
-            except:
-                pass
     if nombre:
         query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
     if empresa:
@@ -215,52 +201,7 @@ def reports():
         except:
             flash('Formato de fecha "hasta" inválido','warning')
     visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
-    sites = Site.query.order_by(Site.nombre).all()
-    return render_template('reports.html', visitantes=visitantes, nombre=nombre, empresa=empresa, desde=desde, hasta=hasta, sites=sites, site_filter=site_filter)
-
-# ---------------- EXPORT CSV ----------------
-@app.route('/reports/export/csv')
-@login_required
-def export_csv():
-    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Nombre","Empresa","Placa","Persona Visitada","Propósito","Entrada","Salida"])
-    for v in visitantes:
-        writer.writerow([
-            v.nombre,
-            v.empresa,
-            v.placa or "",
-            v.persona_visitada or "",
-            v.proposito or "",
-            v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else "",
-            v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ""
-        ])
-    output.seek(0)
-    return send_file(BytesIO(output.getvalue().encode('utf-8')), download_name="visitantes.csv", as_attachment=True, mimetype="text/csv")
-
-# ---------------- EXPORT PDF ----------------
-@app.route('/reports/export/pdf')
-@login_required
-def export_pdf():
-    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    c.setFont("Helvetica", 12)
-    c.drawString(50, height-50, "Reporte de Visitantes")
-    y = height - 80
-    for v in visitantes:
-        text = f"{v.nombre} | {v.empresa} | {v.placa or ''} | {v.persona_visitada or ''} | {v.proposito or ''} | {v.hora_entrada} | {v.hora_salida}"
-        c.drawString(50, y, text)
-        y -= 20
-        if y < 50:
-            c.showPage()
-            c.setFont("Helvetica",12)
-            y = height - 50
-    c.save()
-    buffer.seek(0)
-    return send_file(buffer, download_name="visitantes.pdf", as_attachment=True, mimetype="application/pdf")
+    return render_template('reports.html', visitantes=visitantes, nombre=nombre, empresa=empresa, desde=desde, hasta=hasta)
 
 # ---------------------------------------------------------------------
 # INICIALIZAR DB + SUPERADMIN
@@ -283,6 +224,9 @@ with app.app_context():
         )
         db.session.add(super_user)
         db.session.commit()
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
