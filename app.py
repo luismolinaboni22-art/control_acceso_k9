@@ -1,14 +1,13 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, abort, send_file
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import (
-    LoginManager, login_user, logout_user,
-    login_required, current_user, UserMixin
-)
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from io import BytesIO
-from openpyxl import Workbook
+from io import BytesIO, StringIO
+import csv
+
+# PDF
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -41,7 +40,7 @@ def role_required(role):
 def admin_or_superadmin(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
-        if current_user.role in ['admin', 'superadmin']:
+        if current_user.role in ['admin','superadmin']:
             return f(*args, **kwargs)
         flash("No tiene permisos para acceder.", "danger")
         return redirect(url_for('index'))
@@ -63,7 +62,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(200), unique=True, nullable=False)
     name = db.Column(db.String(200))
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), default="oficial")  # oficial/admin/superadmin
+    role = db.Column(db.String(50), default="oficial")
     active = db.Column(db.Boolean, default=True)
     site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=True)
     site = db.relationship('Site', backref='users')
@@ -89,13 +88,13 @@ class Visitor(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET','POST'])
 def login():
-    if request.method == 'POST':
+    if request.method=='POST':
         email = request.form.get('email','').strip().lower()
         password = request.form.get('password','')
         user = User.query.filter_by(email=email).first()
-        if user and user.active and check_password_hash(user.password_hash, password):
+        if user and user.active and check_password_hash(user.password_hash,password):
             login_user(user)
             return redirect(url_for('index'))
         flash('Credenciales inválidas o usuario inactivo','danger')
@@ -116,20 +115,14 @@ def index():
     base_query = Visitor.query if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id)
     active_visitors_count = base_query.filter(Visitor.hora_salida.is_(None)).count()
     today_start = datetime.combine(date.today(), datetime.min.time())
-    total_today = base_query.filter(Visitor.hora_entrada>=today_start).count()
+    total_today = base_query.filter(Visitor.hora_entrada >= today_start).count()
     visitantes = base_query.order_by(Visitor.hora_entrada.desc()).limit(10).all()
     alertas = [f"⚠ {v.nombre} lleva más de {int((datetime.utcnow()-v.hora_entrada).total_seconds()/3600)} horas dentro de planta."
                for v in base_query.filter(Visitor.hora_salida.is_(None)) if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
     sites = Site.query.order_by(Site.nombre).all()
-    return render_template('index.html', current_user=current_user,
-                           active_visitors_count=active_visitors_count,
-                           pending_count=active_visitors_count,
-                           today_count=total_today,
-                           total_today=total_today,
-                           visitantes=visitantes,
-                           alertas=alertas,
-                           alertas_totales=len(alertas),
-                           sites=sites)
+    return render_template('index.html', current_user=current_user, active_visitors_count=active_visitors_count,
+                           pending_count=active_visitors_count, today_count=total_today, total_today=total_today,
+                           visitantes=visitantes, alertas=alertas, alertas_totales=len(alertas), sites=sites)
 
 # ---------------------------------------------------------------------
 # REGISTRO VISITANTES
@@ -160,7 +153,7 @@ def registrar():
     return render_template('registrar.html', sites=sites)
 
 # ---------------------------------------------------------------------
-# LISTADO VISITANTES
+# LISTAR VISITANTES
 # ---------------------------------------------------------------------
 @app.route('/listar')
 @login_required
@@ -187,7 +180,7 @@ def registrar_salida(visitor_id):
     return redirect(url_for('listar'))
 
 # ---------------------------------------------------------------------
-# REPORTES
+# REPORTES FILTRO + DESCARGAS
 # ---------------------------------------------------------------------
 @app.route('/reports', methods=['GET'])
 @login_required
@@ -203,74 +196,38 @@ def reports():
     else:
         if site_filter:
             try:
-                query = query.filter(Visitor.site_id==int(site_filter))
-            except ValueError:
+                sid = int(site_filter)
+                query = query.filter(Visitor.site_id==sid)
+            except:
                 pass
     if nombre:
-        query = query.filter(Visitor.nombre.ilike(f"%{nombre}%"))
+        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
     if empresa:
-        query = query.filter(Visitor.empresa.ilike(f"%{empresa}%"))
+        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
     if desde:
         try:
-            query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
-        except Exception:
-            flash('Formato de fecha "desde" inválido', 'warning')
+            query = query.filter(Visitor.hora_entrada>=datetime.fromisoformat(desde))
+        except:
+            flash('Formato de fecha "desde" inválido','warning')
     if hasta:
         try:
-            query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
-        except Exception:
-            flash('Formato de fecha "hasta" inválido', 'warning')
+            query = query.filter(Visitor.hora_entrada<=datetime.fromisoformat(hasta))
+        except:
+            flash('Formato de fecha "hasta" inválido','warning')
     visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
     sites = Site.query.order_by(Site.nombre).all()
-    return render_template('reports.html',
-                           visitantes=visitantes,
-                           nombre=nombre,
-                           empresa=empresa,
-                           desde=desde,
-                           hasta=hasta,
-                           sites=sites,
-                           site_filter=site_filter)
+    return render_template('reports.html', visitantes=visitantes, nombre=nombre, empresa=empresa, desde=desde, hasta=hasta, sites=sites, site_filter=site_filter)
 
-# ---------------------------------------------------------------------
-# EXPORTAR PDF
-# ---------------------------------------------------------------------
-@app.route('/reports/export/pdf')
+# ---------------- EXPORT CSV ----------------
+@app.route('/reports/export/csv')
 @login_required
-def export_pdf():
+def export_csv():
     visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-    y = height - 40
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(30, y, "Reporte de Visitantes")
-    c.setFont("Helvetica", 10)
-    y -= 30
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Nombre","Empresa","Placa","Persona Visitada","Propósito","Entrada","Salida"])
     for v in visitantes:
-        line = f"{v.nombre} | {v.empresa} | {v.placa or ''} | {v.persona_visitada or ''} | {v.proposito or ''} | {v.hora_entrada} | {v.hora_salida}"
-        c.drawString(30, y, line)
-        y -= 15
-        if y < 40:
-            c.showPage()
-            y = height - 40
-    c.save()
-    buffer.seek(0)
-    return send_file(buffer, download_name="visitantes.pdf", as_attachment=True)
-
-# ---------------------------------------------------------------------
-# EXPORTAR EXCEL
-# ---------------------------------------------------------------------
-@app.route('/reports/export/excel')
-@login_required
-def export_excel():
-    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Visitantes"
-    headers = ["Nombre","Empresa","Placa","Persona Visitada","Propósito","Entrada","Salida"]
-    ws.append(headers)
-    for v in visitantes:
-        ws.append([
+        writer.writerow([
             v.nombre,
             v.empresa,
             v.placa or "",
@@ -279,147 +236,31 @@ def export_excel():
             v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else "",
             v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ""
         ])
-    output = BytesIO()
-    wb.save(output)
     output.seek(0)
-    return send_file(output, download_name="visitantes.xlsx", as_attachment=True)
+    return send_file(BytesIO(output.getvalue().encode('utf-8')), download_name="visitantes.csv", as_attachment=True, mimetype="text/csv")
 
-# ---------------------------------------------------------------------
-# ADMIN USUARIOS
-# ---------------------------------------------------------------------
-@app.route('/admin/users')
+# ---------------- EXPORT PDF ----------------
+@app.route('/reports/export/pdf')
 @login_required
-@role_required('superadmin')
-def admin_users():
-    users = User.query.order_by(User.name.asc()).all()
-    sites = Site.query.order_by(Site.nombre).all()
-    return render_template('admin_users.html', users=users, sites=sites)
-
-@app.route('/admin/users/create', methods=['GET','POST'])
-@login_required
-@role_required('superadmin')
-def admin_user_create():
-    sites = Site.query.order_by(Site.nombre).all()
-    if request.method=='POST':
-        email = request.form.get('email','').strip().lower()
-        nombre = request.form.get('name','').strip()
-        role = request.form.get('role','oficial')
-        password = request.form.get('password','')
-        site_id = int(request.form.get('site_id')) if request.form.get('site_id') else None
-        if not email or not nombre or not password:
-            flash("Nombre, email y contraseña son obligatorios","danger")
-            return redirect(url_for('admin_user_create'))
-        if User.query.filter_by(email=email).first():
-            flash("El correo ya está registrado","danger")
-            return redirect(url_for('admin_user_create'))
-        nuevo = User(email=email,name=nombre,role=role,password_hash=generate_password_hash(password),active=True,site_id=site_id)
-        db.session.add(nuevo)
-        db.session.commit()
-        flash("Usuario creado correctamente","success")
-        return redirect(url_for('admin_users'))
-    return render_template('admin_user_form.html', action='create', sites=sites, user=None)
-
-@app.route('/admin/users/edit/<int:user_id>', methods=['GET','POST'])
-@login_required
-@role_required('superadmin')
-def admin_user_edit(user_id):
-    user = User.query.get_or_404(user_id)
-    sites = Site.query.order_by(Site.nombre).all()
-    if request.method=='POST':
-        user.email = request.form.get('email', user.email).strip().lower()
-        user.name = request.form.get('name', user.name).strip()
-        user.role = request.form.get('role', user.role)
-        site_id = int(request.form.get('site_id')) if request.form.get('site_id') else None
-        user.site_id = site_id
-        new_password = request.form.get('password','')
-        if new_password:
-            user.password_hash = generate_password_hash(new_password)
-        db.session.commit()
-        flash("Usuario actualizado","success")
-        return redirect(url_for('admin_users'))
-    return render_template('admin_user_form.html', action='edit', user=user, sites=sites)
-
-@app.route('/admin/users/toggle/<int:user_id>', methods=['POST'])
-@login_required
-@role_required('superadmin')
-def admin_user_toggle(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.id == current_user.id:
-        flash("No puede desactivar su propio usuario","danger")
-        return redirect(url_for('admin_users'))
-    user.active = not user.active
-    db.session.commit()
-    estado = "activado" if user.active else "desactivado"
-    flash(f"Usuario {estado}","info")
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
-@login_required
-@role_required('superadmin')
-def admin_user_delete(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.id == current_user.id:
-        flash("No puede eliminar su propio usuario","danger")
-        return redirect(url_for('admin_users'))
-    db.session.delete(user)
-    db.session.commit()
-    flash("Usuario eliminado correctamente","success")
-    return redirect(url_for('admin_users'))
-
-# ---------------------------------------------------------------------
-# ADMIN SITIOS
-# ---------------------------------------------------------------------
-@app.route('/admin/sites/new', methods=['GET','POST'])
-@login_required
-@admin_or_superadmin
-def admin_sites_new():
-    users = User.query.order_by(User.name).all()
-    if request.method=='POST':
-        nombre = request.form.get('nombre','').strip()
-        ubicacion = request.form.get('ubicacion','').strip()
-        if not nombre:
-            flash("El nombre es obligatorio","danger")
-            return redirect(url_for('admin_sites_new'))
-        nuevo = Site(nombre=nombre, ubicacion=ubicacion)
-        db.session.add(nuevo)
-        db.session.commit()
-        flash("Sitio creado exitosamente","success")
-        return redirect(url_for('admin_sites'))
-    return render_template('admin_sites_new.html', users=users)
-
-@app.route('/admin/sites/edit/<int:site_id>', methods=['GET','POST'])
-@login_required
-@admin_or_superadmin
-def admin_sites_edit(site_id):
-    sitio = Site.query.get_or_404(site_id)
-    users = User.query.order_by(User.name).all()
-    if request.method=='POST':
-        sitio.nombre = request.form.get('nombre', sitio.nombre).strip()
-        sitio.ubicacion = request.form.get('ubicacion', sitio.ubicacion).strip()
-        db.session.commit()
-        flash("Sitio actualizado correctamente","success")
-        return redirect(url_for('admin_sites'))
-    return render_template('admin_sites_edit.html', site=sitio, users=users)
-
-@app.route('/admin/sites/toggle/<int:site_id>', methods=['POST'])
-@login_required
-@admin_or_superadmin
-def admin_sites_toggle(site_id):
-    sitio = Site.query.get_or_404(site_id)
-    sitio.activo = not sitio.activo
-    db.session.commit()
-    flash("Estado actualizado","info")
-    return redirect(url_for('admin_sites'))
-
-@app.route('/admin/sites/delete/<int:site_id>', methods=['POST'])
-@login_required
-@admin_or_superadmin
-def admin_sites_delete(site_id):
-    sitio = Site.query.get_or_404(site_id)
-    db.session.delete(sitio)
-    db.session.commit()
-    flash("Sitio eliminado","danger")
-    return redirect(url_for('admin_sites'))
+def export_pdf():
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()).all()
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    c.setFont("Helvetica", 12)
+    c.drawString(50, height-50, "Reporte de Visitantes")
+    y = height - 80
+    for v in visitantes:
+        text = f"{v.nombre} | {v.empresa} | {v.placa or ''} | {v.persona_visitada or ''} | {v.proposito or ''} | {v.hora_entrada} | {v.hora_salida}"
+        c.drawString(50, y, text)
+        y -= 20
+        if y < 50:
+            c.showPage()
+            c.setFont("Helvetica",12)
+            y = height - 50
+    c.save()
+    buffer.seek(0)
+    return send_file(buffer, download_name="visitantes.pdf", as_attachment=True, mimetype="application/pdf")
 
 # ---------------------------------------------------------------------
 # INICIALIZAR DB + SUPERADMIN
@@ -443,8 +284,5 @@ with app.app_context():
         db.session.add(super_user)
         db.session.commit()
 
-# ---------------------------------------------------------------------
-# RUN APP
-# ---------------------------------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
