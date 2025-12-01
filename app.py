@@ -112,8 +112,7 @@ def index():
                for v in base_query.filter(Visitor.hora_salida.is_(None))
                if v.hora_entrada and (datetime.utcnow()-v.hora_entrada).total_seconds()/3600>=8]
     sites = Site.query.order_by(Site.nombre).all()
-    return render_template('index.html',
-                           current_user=current_user,
+    return render_template('index.html', current_user=current_user,
                            active_visitors_count=active_visitors_count,
                            pending_count=active_visitors_count,
                            today_count=total_today,
@@ -124,85 +123,96 @@ def index():
                            sites=sites)
 
 # -----------------------------
-# ADMINISTRACIÓN DE USUARIOS
+# REGISTRAR VISITANTES
 # -----------------------------
-@app.route('/admin/users')
+@app.route('/registrar', methods=['GET','POST'])
 @login_required
-@role_required('superadmin')
-def admin_users():
-    users = User.query.order_by(User.name.asc()).all()
-    return render_template('admin_users.html', users=users)
-
-@app.route('/admin/users/new', methods=['GET','POST'])
-@login_required
-@role_required('superadmin')
-def admin_users_new():
-    sites = Site.query.order_by(Site.nombre).all()
+def registrar():
+    sites = Site.query.filter_by(activo=True).order_by(Site.nombre).all()
     if request.method=='POST':
-        email = request.form.get('email','').strip().lower()
-        name = request.form.get('name','').strip()
-        password = request.form.get('password','')
-        role = request.form.get('role','oficial')
-        site_id = request.form.get('site_id') or None
-
-        if not email or not name or not password:
-            flash("Email, nombre y contraseña son obligatorios","danger")
-            return redirect(url_for('admin_users_new'))
-        if User.query.filter_by(email=email).first():
-            flash("El correo ya está registrado","danger")
-            return redirect(url_for('admin_users_new'))
-
-        user = User(email=email, name=name, password_hash=generate_password_hash(password), role=role, active=True, site_id=site_id)
-        db.session.add(user)
+        nombre = request.form.get('nombre','').strip()
+        if not nombre:
+            flash('El nombre es obligatorio','danger')
+            return redirect(url_for('registrar'))
+        site_id = int(request.form.get('site_id')) if current_user.role=='superadmin' and request.form.get('site_id') else current_user.site_id
+        visitor = Visitor(
+            nombre=nombre,
+            cedula=request.form.get('cedula'),
+            empresa=request.form.get('empresa'),
+            placa=request.form.get('placa'),
+            persona_visitada=request.form.get('persona'),
+            proposito=request.form.get('proposito'),
+            site_id=site_id
+        )
+        db.session.add(visitor)
         db.session.commit()
-        flash("Usuario creado correctamente","success")
-        return redirect(url_for('admin_users'))
-    return render_template('admin_user_form.html', action='create', sites=sites, user=None)
+        flash('Visitante registrado con éxito','success')
+        return redirect(url_for('index'))
+    return render_template('registrar.html', sites=sites)
 
-@app.route('/admin/users/edit/<int:user_id>', methods=['GET','POST'])
+# -----------------------------
+# REPORTES
+# -----------------------------
+@app.route('/reports', methods=['GET'])
 @login_required
-@role_required('superadmin')
-def admin_users_edit(user_id):
-    user = User.query.get_or_404(user_id)
-    sites = Site.query.order_by(Site.nombre).all()
-    if request.method=='POST':
-        user.email = request.form.get('email',user.email).strip().lower()
-        user.name = request.form.get('name',user.name).strip()
-        user.role = request.form.get('role',user.role)
-        user.site_id = request.form.get('site_id') or None
-        new_password = request.form.get('password','')
-        if new_password:
-            user.password_hash = generate_password_hash(new_password)
-        db.session.commit()
-        flash("Usuario actualizado","success")
-        return redirect(url_for('admin_users'))
-    return render_template('admin_user_form.html', action='edit', sites=sites, user=user)
+def reports():
+    nombre = request.args.get('nombre','')
+    empresa = request.args.get('empresa','')
+    desde = request.args.get('desde','')
+    hasta = request.args.get('hasta','')
+    export_csv = request.args.get('export','')
 
-@app.route('/admin/users/toggle/<int:user_id>', methods=['POST'])
-@login_required
-@role_required('superadmin')
-def admin_users_toggle(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.id == current_user.id:
-        flash("No puede desactivar su propio usuario","danger")
-        return redirect(url_for('admin_users'))
-    user.active = not user.active
-    db.session.commit()
-    flash("Estado actualizado","info")
-    return redirect(url_for('admin_users'))
+    query = Visitor.query
+    if current_user.role != 'superadmin':
+        query = query.filter(Visitor.site_id == current_user.site_id)
+    if nombre:
+        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
+    if empresa:
+        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
+    if desde:
+        try:
+            query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
+        except:
+            flash('Formato de fecha "desde" inválido','warning')
+    if hasta:
+        try:
+            query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
+        except:
+            flash('Formato de fecha "hasta" inválido','warning')
 
-@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
+
+    # Export CSV
+    if export_csv.lower() == 'true':
+        def generate():
+            header = ['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida']
+            yield ','.join(header) + '\n'
+            for v in visitantes:
+                row = [
+                    v.nombre,
+                    v.empresa or '',
+                    v.cedula or '',
+                    v.placa or '',
+                    v.persona_visitada or '',
+                    v.proposito or '',
+                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
+                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
+                ]
+                yield ','.join(row) + '\n'
+        return Response(generate(), mimetype='text/csv',
+                        headers={"Content-Disposition": "attachment;filename=reportes_visitantes.csv"})
+
+    return render_template('reports.html', visitantes=visitantes,
+                           nombre=nombre, empresa=empresa, desde=desde, hasta=hasta)
+
+# -----------------------------
+# LISTAR VISITANTES
+# -----------------------------
+@app.route('/listar')
 @login_required
-@role_required('superadmin')
-def admin_users_delete(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.id == current_user.id:
-        flash("No puede eliminar su propio usuario","danger")
-        return redirect(url_for('admin_users'))
-    db.session.delete(user)
-    db.session.commit()
-    flash("Usuario eliminado","success")
-    return redirect(url_for('admin_users'))
+def listar():
+    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()) if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id).order_by(Visitor.hora_entrada.desc())
+    return render_template('listar.html', visitantes=visitantes.all())
 
 # -----------------------------
 # INICIALIZAR DB + SUPERADMIN
@@ -211,7 +221,7 @@ with app.app_context():
     db.create_all()
     default_site = Site.query.filter_by(nombre="Central").first()
     if not default_site:
-        default_site = Site(nombre="Central", ubicacion="Sede principal")
+        default_site = Site(nombre="Central", ubicacion="Sede principal", activo=True)
         db.session.add(default_site)
         db.session.commit()
     if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
@@ -225,6 +235,7 @@ with app.app_context():
         )
         db.session.add(super_user)
         db.session.commit()
+
 
 if __name__ == '__main__':
     app.run(debug=True)
