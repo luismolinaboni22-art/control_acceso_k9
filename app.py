@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, abort
+from flask import Flask, render_template, redirect, url_for, request, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from datetime import datetime, date
@@ -44,14 +44,12 @@ def admin_or_superadmin(f):
 # MODELOS
 # -----------------------------
 class Site(db.Model):
-    __tablename__ = 'site'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     ubicacion = db.Column(db.String(300))
     activo = db.Column(db.Boolean, default=True)
 
 class User(UserMixin, db.Model):
-    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(200), unique=True, nullable=False)
     name = db.Column(db.String(200))
@@ -62,7 +60,6 @@ class User(UserMixin, db.Model):
     site = db.relationship('Site', backref='users')
 
 class Visitor(db.Model):
-    __tablename__ = 'visitor'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     cedula = db.Column(db.String(100))
@@ -127,66 +124,85 @@ def index():
                            sites=sites)
 
 # -----------------------------
-# REGISTRAR VISITANTES
+# ADMINISTRACIÓN DE USUARIOS
 # -----------------------------
-@app.route('/registrar', methods=['GET','POST'])
+@app.route('/admin/users')
 @login_required
-def registrar():
-    sites = Site.query.filter_by(activo=True).order_by(Site.nombre).all()
+@role_required('superadmin')
+def admin_users():
+    users = User.query.order_by(User.name.asc()).all()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/users/new', methods=['GET','POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_new():
+    sites = Site.query.order_by(Site.nombre).all()
     if request.method=='POST':
-        nombre = request.form.get('nombre','').strip()
-        if not nombre:
-            flash('El nombre es obligatorio','danger')
-            return redirect(url_for('registrar'))
-        site_id = int(request.form.get('site_id')) if current_user.role=='superadmin' and request.form.get('site_id') else current_user.site_id
-        visitor = Visitor(
-            nombre=nombre,
-            cedula=request.form.get('cedula'),
-            empresa=request.form.get('empresa'),
-            placa=request.form.get('placa'),
-            persona_visitada=request.form.get('persona'),
-            proposito=request.form.get('proposito'),
-            site_id=site_id
-        )
-        db.session.add(visitor)
+        email = request.form.get('email','').strip().lower()
+        name = request.form.get('name','').strip()
+        password = request.form.get('password','')
+        role = request.form.get('role','oficial')
+        site_id = request.form.get('site_id') or None
+
+        if not email or not name or not password:
+            flash("Email, nombre y contraseña son obligatorios","danger")
+            return redirect(url_for('admin_users_new'))
+        if User.query.filter_by(email=email).first():
+            flash("El correo ya está registrado","danger")
+            return redirect(url_for('admin_users_new'))
+
+        user = User(email=email, name=name, password_hash=generate_password_hash(password), role=role, active=True, site_id=site_id)
+        db.session.add(user)
         db.session.commit()
-        flash('Visitante registrado con éxito','success')
-        return redirect(url_for('index'))
-    return render_template('registrar.html', sites=sites)
+        flash("Usuario creado correctamente","success")
+        return redirect(url_for('admin_users'))
+    return render_template('admin_user_form.html', action='create', sites=sites, user=None)
 
-# -----------------------------
-# LISTAR VISITANTES
-# -----------------------------
-@app.route('/listar')
+@app.route('/admin/users/edit/<int:user_id>', methods=['GET','POST'])
 @login_required
-def listar():
-    visitantes = Visitor.query.order_by(Visitor.hora_entrada.desc()) if current_user.role=='superadmin' else Visitor.query.filter_by(site_id=current_user.site_id).order_by(Visitor.hora_entrada.desc())
-    return render_template('listar.html', visitantes=visitantes.all())
-
-# -----------------------------
-# REGISTRAR SALIDA
-# -----------------------------
-@app.route('/salida/<int:visitor_id>', methods=['POST'])
-@login_required
-def registrar_salida(visitor_id):
-    visitor = Visitor.query.get_or_404(visitor_id)
-    if current_user.role!='superadmin' and visitor.site_id!=current_user.site_id:
-        flash('No tiene permiso para registrar salida de este visitante','danger')
-        return redirect(url_for('listar'))
-    if visitor.hora_salida is None:
-        visitor.hora_salida = datetime.utcnow()
+@role_required('superadmin')
+def admin_users_edit(user_id):
+    user = User.query.get_or_404(user_id)
+    sites = Site.query.order_by(Site.nombre).all()
+    if request.method=='POST':
+        user.email = request.form.get('email',user.email).strip().lower()
+        user.name = request.form.get('name',user.name).strip()
+        user.role = request.form.get('role',user.role)
+        user.site_id = request.form.get('site_id') or None
+        new_password = request.form.get('password','')
+        if new_password:
+            user.password_hash = generate_password_hash(new_password)
         db.session.commit()
-        flash(f'Salida registrada para {visitor.nombre}','success')
-    else:
-        flash(f'La salida de {visitor.nombre} ya estaba registrada','warning')
-    return redirect(url_for('listar'))
+        flash("Usuario actualizado","success")
+        return redirect(url_for('admin_users'))
+    return render_template('admin_user_form.html', action='edit', sites=sites, user=user)
 
-# -----------------------------
-# ADMIN USUARIOS y SITIOS
-# -----------------------------
-# Mantener todas tus rutas actuales de admin_users y admin_sites
-# Asegúrate de que todos los url_for sean correctos
-# No se tocan para mantener funcionalidad
+@app.route('/admin/users/toggle/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_toggle(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash("No puede desactivar su propio usuario","danger")
+        return redirect(url_for('admin_users'))
+    user.active = not user.active
+    db.session.commit()
+    flash("Estado actualizado","info")
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@login_required
+@role_required('superadmin')
+def admin_users_delete(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash("No puede eliminar su propio usuario","danger")
+        return redirect(url_for('admin_users'))
+    db.session.delete(user)
+    db.session.commit()
+    flash("Usuario eliminado","success")
+    return redirect(url_for('admin_users'))
 
 # -----------------------------
 # INICIALIZAR DB + SUPERADMIN
@@ -195,7 +211,7 @@ with app.app_context():
     db.create_all()
     default_site = Site.query.filter_by(nombre="Central").first()
     if not default_site:
-        default_site = Site(nombre="Central", ubicacion="Sede principal", activo=True)
+        default_site = Site(nombre="Central", ubicacion="Sede principal")
         db.session.add(default_site)
         db.session.commit()
     if not User.query.filter_by(email="jorgemolinabonilla@gmail.com").first():
@@ -212,64 +228,3 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(debug=True)
-    # -----------------------------
-# REPORTES VISUALIZAR Y EXPORTAR CSV
-# -----------------------------
-@app.route('/reports', methods=['GET'])
-@login_required
-def reports():
-    nombre = request.args.get('nombre','')
-    empresa = request.args.get('empresa','')
-    desde = request.args.get('desde','')
-    hasta = request.args.get('hasta','')
-    export_csv = request.args.get('export','')
-
-    # Query base
-    query = Visitor.query
-    if current_user.role != 'superadmin':
-        query = query.filter(Visitor.site_id == current_user.site_id)
-
-    if nombre:
-        query = query.filter(Visitor.nombre.ilike(f'%{nombre}%'))
-    if empresa:
-        query = query.filter(Visitor.empresa.ilike(f'%{empresa}%'))
-    if desde:
-        try:
-            query = query.filter(Visitor.hora_entrada >= datetime.fromisoformat(desde))
-        except:
-            flash('Formato de fecha "desde" inválido','warning')
-    if hasta:
-        try:
-            query = query.filter(Visitor.hora_entrada <= datetime.fromisoformat(hasta))
-        except:
-            flash('Formato de fecha "hasta" inválido','warning')
-
-    visitantes = query.order_by(Visitor.hora_entrada.desc()).all()
-
-    # Exportar CSV si se solicita
-    if export_csv.lower() == 'true':
-        def generate():
-            header = ['Nombre','Empresa','Cédula','Placa','Persona Visitada','Propósito','Hora Entrada','Hora Salida']
-            yield ','.join(header) + '\n'
-            for v in visitantes:
-                row = [
-                    v.nombre,
-                    v.empresa or '',
-                    v.cedula or '',
-                    v.placa or '',
-                    v.persona_visitada or '',
-                    v.proposito or '',
-                    v.hora_entrada.strftime('%Y-%m-%d %H:%M:%S') if v.hora_entrada else '',
-                    v.hora_salida.strftime('%Y-%m-%d %H:%M:%S') if v.hora_salida else ''
-                ]
-                yield ','.join(row) + '\n'
-        return Response(generate(), mimetype='text/csv',
-                        headers={"Content-Disposition":"attachment;filename=reportes_visitantes.csv"})
-
-    return render_template('reports.html',
-                           visitantes=visitantes,
-                           nombre=nombre,
-                           empresa=empresa,
-                           desde=desde,
-                           hasta=hasta)
-
